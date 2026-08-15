@@ -1,5 +1,7 @@
 package com.stickmanai.android.overlay
 
+import com.stickmanai.android.CHARACTERS
+
 /** Mirrors src/loop/userMessage.js - one pending chat message per character, consumed on its next AI turn. */
 object PendingMessages {
     private val pending = HashMap<String, String>()
@@ -7,6 +9,12 @@ object PendingMessages {
     @Synchronized
     fun set(characterId: String, text: String) {
         pending[characterId] = text
+    }
+
+    /** Group chat: same message reaches every character's own context this round. */
+    @Synchronized
+    fun setAll(text: String) {
+        for (character in CHARACTERS) pending[character.id] = text
     }
 
     @Synchronized

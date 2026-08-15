@@ -41,6 +41,10 @@
                 android:value="desktop-pet-overlay" />
         </service>
 
+        <receiver
+            android:name=".chat.ChatReplyReceiver"
+            android:exported="false" />
+
         <service
             android:name=".input.TapAccessibilityService"
             android:exported="false"

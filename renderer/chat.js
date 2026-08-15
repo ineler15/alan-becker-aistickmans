@@ -5,6 +5,12 @@ const button = document.getElementById('send');
 async function init() {
   const { characters, defaultCharacterId } = await window.stickmanAPI.getCharacters();
   select.innerHTML = '';
+  if (characters.length > 1) {
+    const allOption = document.createElement('option');
+    allOption.value = '__all__';
+    allOption.textContent = 'Todos (grupal)';
+    select.appendChild(allOption);
+  }
   for (const c of characters) {
     const option = document.createElement('option');
     option.value = c.id;

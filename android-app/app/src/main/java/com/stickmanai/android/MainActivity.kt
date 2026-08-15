@@ -57,6 +57,16 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnStart.setOnClickListener { startOverlayService() }
         binding.btnStop.setOnClickListener { stopService(Intent(this, OverlayService::class.java)) }
+        binding.btnGroupChat.setOnClickListener {
+            startActivity(
+                Intent(this, com.stickmanai.android.chat.ChatActivity::class.java).apply {
+                    putExtra(
+                        com.stickmanai.android.chat.ChatActivity.EXTRA_CHARACTER_ID,
+                        com.stickmanai.android.chat.ChatActivity.GROUP_CHAT_ID,
+                    )
+                }
+            )
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             requestNotificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)

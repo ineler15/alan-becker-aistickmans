@@ -220,7 +220,13 @@ class OverlayService : LifecycleService() {
                 val state = args.optString("state", "idle")
                 overlay.state.setEmotion(if (state == "happy" || state == "trip" || state == "sad" || state == "scared") state else null)
             }
-            "say" -> overlay.say(args.optString("text", ""))
+            "say" -> {
+                val text = args.optString("text", "")
+                overlay.say(text)
+                if (text.isNotBlank()) {
+                    com.stickmanai.android.chat.ChatNotifications.showSay(this, overlay.def.id, overlay.def.displayName, text)
+                }
+            }
             "define_personality" -> Prefs.setPersonality(this, overlay.def.id, args.optString("description", ""))
             "remember" -> Prefs.addMemory(this, overlay.def.id, args.optString("note", ""))
             "open_app" -> openUrl(args.optString("url", ""))

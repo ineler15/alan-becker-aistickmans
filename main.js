@@ -192,8 +192,15 @@ app.whenReady().then(() => {
   }));
 
   ipcMain.on('stickman:chat-message', (_event, { characterId, text }) => {
-    if (typeof text === 'string' && text.trim() && CHARACTERS.some((c) => c.id === characterId)) {
-      userMessage.set(characterId, text.trim());
+    const trimmed = typeof text === 'string' ? text.trim() : '';
+    if (!trimmed) return;
+    if (characterId === '__all__') {
+      // Group chat: same message reaches every active character's own context this round,
+      // instead of being aimed at just one - each still replies in its own voice/personality.
+      for (const character of CHARACTERS) userMessage.set(character.id, trimmed);
+      agentLoop.wakeNow();
+    } else if (CHARACTERS.some((c) => c.id === characterId)) {
+      userMessage.set(characterId, trimmed);
       agentLoop.wakeNow();
     }
   });

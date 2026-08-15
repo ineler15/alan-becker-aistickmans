@@ -9,4 +9,5 @@
     <string name="pc_address_hint">IP:puerto de la PC (ej: 192.168.18.27:8787)</string>
     <string name="tap_accessibility_description">Le permite a tus personajes tocar la pantalla por vos (accion "tap"), como si fueran un dedo. No lee el contenido de la pantalla, solo toca donde el personaje decide.</string>
     <string name="grant_accessibility">Permitir que toquen la pantalla</string>
+    <string name="group_chat">Hablarle a todos (chat grupal)</string>
 </resources>
