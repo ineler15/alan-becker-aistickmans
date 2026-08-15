@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>La casa de los stickmans</title>
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: linear-gradient(to bottom, #bfe3ff 0%, #eaf7ff 60%, #d8f0c8 60%, #b8dfa0 100%);
+    overflow: hidden;
+    font-family: sans-serif;
+  }
+  #room {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+  .character {
+    position: absolute;
+    bottom: 6%;
+    width: 96px;
+    height: 96px;
+    transform: translateX(-50%);
+    transition: left 1.4s linear;
+    image-rendering: pixelated;
+  }
+  .character img {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .character.tablet img {
+    opacity: 0.85;
+    filter: drop-shadow(0 0 4px #6cf);
+  }
+  .name {
+    position: absolute;
+    bottom: -18px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    color: #333;
+    white-space: nowrap;
+    text-shadow: 0 0 3px #fff, 0 0 3px #fff;
+  }
+  .bubble {
+    position: absolute;
+    bottom: 105px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255,255,255,0.95);
+    border: 1px solid #999;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 13px;
+    max-width: 220px;
+    text-align: center;
+    display: none;
+    white-space: normal;
+  }
+  #floorLine {
+    position: absolute;
+    bottom: 6%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: rgba(0,0,0,0.15);
+  }
+  #status {
+    position: absolute;
+    top: 8px;
+    left: 12px;
+    font-size: 12px;
+    color: #555;
+  }
+</style>
+</head>
+<body>
+  <div id="room">
+    <div id="floorLine"></div>
+    <div id="status">conectando…</div>
+  </div>
+
+<script>
+const room = document.getElementById('room');
+const statusEl = document.getElementById('status');
+const nodes = new Map(); // id -> {el, bubbleEl, lastSay}
+const SAY_DURATION_MS = 8000;
+
+function ensureNode(peer) {
+  let entry = nodes.get(peer.id);
+  if (entry) return entry;
+
+  const el = document.createElement('div');
+  el.className = 'character' + (peer.device === 'tablet' ? ' tablet' : '');
+
+  const img = document.createElement('img');
+  img.src = '/sprites/' + encodeURIComponent(peer.id) + '/stand01.png';
+  el.appendChild(img);
+
+  const name = document.createElement('div');
+  name.className = 'name';
+  name.textContent = peer.displayName + (peer.device === 'tablet' ? ' (tablet)' : '');
+  el.appendChild(name);
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  el.appendChild(bubble);
+
+  room.appendChild(el);
+  entry = { el, bubble, lastSay: null, sayUntil: 0 };
+  nodes.set(peer.id, entry);
+  return entry;
+}
+
+function render(peers) {
+  const seen = new Set();
+  for (const peer of peers) {
+    if (peer.x == null || !peer.screenWidth) continue;
+    seen.add(peer.id);
+    const entry = ensureNode(peer);
+    const xPercent = Math.max(0, Math.min(100, (peer.x / peer.screenWidth) * 100));
+    entry.el.style.left = xPercent + '%';
+
+    if (peer.lastSay && peer.lastSay !== entry.lastSay) {
+      entry.lastSay = peer.lastSay;
+      entry.sayUntil = Date.now() + SAY_DURATION_MS;
+    }
+    if (peer.lastSay && Date.now() < entry.sayUntil) {
+      entry.bubble.textContent = peer.lastSay;
+      entry.bubble.style.display = 'block';
+    } else {
+      entry.bubble.style.display = 'none';
+    }
+  }
+  for (const [id, entry] of nodes) {
+    if (!seen.has(id)) {
+      entry.el.remove();
+      nodes.delete(id);
+    }
+  }
+  statusEl.textContent = peers.length + ' viviendo aca';
+}
+
+async function poll() {
+  try {
+    const res = await fetch('/peers/all');
+    const data = await res.json();
+    render(data.peers || []);
+  } catch (e) {
+    statusEl.textContent = 'sin conexion con la PC…';
+  } finally {
+    setTimeout(poll, 1500);
+  }
+}
+poll();
+</script>
+</body>
+</html>

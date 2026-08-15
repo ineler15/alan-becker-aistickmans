@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Stickman AI</string>
+    <string name="grant_overlay">Permitir dibujar sobre otras apps</string>
+    <string name="start_service">Iniciar</string>
+    <string name="stop_service">Detener</string>
+    <string name="gemini_api_key_hint">API key de Gemini (compartida, opcional si cada uno tiene la suya)</string>
+    <string name="send">Enviar</string>
+    <string name="message_hint">Escribile algo…</string>
+    <string name="pc_address_hint">IP:puerto de la PC (ej: 192.168.18.27:8787)</string>
+</resources>

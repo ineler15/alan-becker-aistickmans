@@ -1,0 +1,24 @@
+{
+  "name": "stickman-ia",
+  "version": "0.1.0",
+  "description": "Stickman de escritorio con IA real que puede manipular la PC (estilo Alan Becker)",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "start": "npm run build && electron ."
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.0",
+    "@nut-tree-fork/nut-js": "^4.2.0",
+    "active-win": "^8.2.1",
+    "dotenv": "^16.4.5",
+    "jimp": "^0.22.10",
+    "tesseract.js": "^5.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "electron": "^32.0.0",
+    "typescript": "^5.9.3"
+  }
+}
