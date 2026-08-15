@@ -4,35 +4,201 @@
 <meta charset="utf-8" />
 <title>La casa de los stickmans</title>
 <style>
+  :root {
+    --night: 0;
+  }
   html, body {
     margin: 0;
     height: 100%;
-    background: linear-gradient(to bottom, #bfe3ff 0%, #eaf7ff 60%, #d8f0c8 60%, #b8dfa0 100%);
     overflow: hidden;
-    font-family: sans-serif;
+    font-family: 'Segoe UI', sans-serif;
   }
   #room {
     position: relative;
     width: 100%;
     height: 100%;
+    background: #bfe3ff;
   }
+
+  /* --- Ciclo dia/noche: 4 capas superpuestas, se cruzan con opacity --- */
+  .skylayer {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 2.5s ease;
+    pointer-events: none;
+  }
+  .skylayer.active { opacity: 1; }
+  .skylayer .sky { position: absolute; inset: 0 0 40% 0; }
+  .skylayer .ground { position: absolute; inset: 60% 0 0 0; }
+  .skylayer.day .sky { background: linear-gradient(to bottom, #bfe3ff 0%, #eaf7ff 100%); }
+  .skylayer.day .ground { background: linear-gradient(to bottom, #d8f0c8 0%, #b8dfa0 100%); }
+  .skylayer.dawn .sky { background: linear-gradient(to bottom, #ffd9a0 0%, #ffe9d6 60%, #eaf7ff 100%); }
+  .skylayer.dawn .ground { background: linear-gradient(to bottom, #dbe8b8 0%, #b3cf95 100%); }
+  .skylayer.dusk .sky { background: linear-gradient(to bottom, #4a3b6b 0%, #d97a5a 55%, #ffcf94 100%); }
+  .skylayer.dusk .ground { background: linear-gradient(to bottom, #4f5b3d 0%, #3a4530 100%); }
+  .skylayer.night .sky { background: linear-gradient(to bottom, #060b1f 0%, #131c3d 60%, #22305c 100%); }
+  .skylayer.night .ground { background: linear-gradient(to bottom, #101b12 0%, #0a120c 100%); }
+
+  /* --- Sol / luna --- */
+  .celestial {
+    position: absolute;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    opacity: 0;
+    transition: opacity 2s ease, left 30s linear, top 30s linear;
+    pointer-events: none;
+  }
+  #sun {
+    background: radial-gradient(circle at 35% 35%, #fff6d0, #ffd35c 60%, #ffb347 100%);
+    box-shadow: 0 0 40px 10px rgba(255, 210, 100, 0.55);
+  }
+  #moon {
+    background: radial-gradient(circle at 35% 35%, #ffffff, #e4e9f5 60%, #b9c2dd 100%);
+    box-shadow: 0 0 25px 6px rgba(210, 220, 255, 0.4);
+  }
+  .celestial.visible { opacity: 1; }
+
+  /* --- Estrellas --- */
+  #stars { position: absolute; inset: 0 0 40% 0; opacity: 0; transition: opacity 2.5s ease; pointer-events: none; }
+  #stars.visible { opacity: 1; }
+  .star {
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    background: #fff;
+    border-radius: 50%;
+    animation: twinkle 3s ease-in-out infinite;
+  }
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.25; }
+    50% { opacity: 1; }
+  }
+
+  /* --- Luciernagas de noche --- */
+  .firefly {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #d4ff8a;
+    box-shadow: 0 0 6px 2px rgba(212, 255, 138, 0.9);
+    opacity: 0;
+    transition: opacity 2s ease;
+    animation: float 6s ease-in-out infinite;
+  }
+  .firefly.visible { opacity: 0.9; }
+  @keyframes float {
+    0%, 100% { transform: translate(0, 0); }
+    50% { transform: translate(8px, -14px); }
+  }
+
+  /* --- Nubes de dia --- */
+  .cloud {
+    position: absolute;
+    top: 8%;
+    width: 90px;
+    height: 26px;
+    background: rgba(255, 255, 255, 0.85);
+    border-radius: 20px;
+    box-shadow: 20px 8px 0 -2px rgba(255,255,255,0.7), -20px 4px 0 -4px rgba(255,255,255,0.6);
+    opacity: 0;
+    transition: opacity 2.5s ease;
+    animation: drift 60s linear infinite;
+  }
+  .cloud.visible { opacity: 0.9; }
+  @keyframes drift {
+    from { transform: translateX(-15vw); }
+    to { transform: translateX(115vw); }
+  }
+
+  /* --- Decoracion fija: arbolitos, banco, guirnalda de luces --- */
+  .tree {
+    position: absolute;
+    bottom: 6%;
+    width: 30px;
+    height: 70px;
+  }
+  .tree .trunk { position: absolute; bottom: 0; left: 12px; width: 6px; height: 26px; background: #6b4a2f; border-radius: 2px; }
+  .tree .leaves { position: absolute; bottom: 20px; left: 0; width: 30px; height: 40px; background: #4c8a3f; border-radius: 50% 50% 45% 45%; box-shadow: inset -4px -4px 0 rgba(0,0,0,0.08); }
+  body.phase-night .tree .leaves, body.phase-dusk .tree .leaves { filter: brightness(0.55); }
+
+  .bench {
+    position: absolute;
+    bottom: 6%;
+    width: 46px;
+    height: 20px;
+  }
+  .bench::before, .bench::after {
+    content: "";
+    position: absolute;
+    background: #8a5a34;
+  }
+  .bench::before { top: 0; left: 0; width: 46px; height: 6px; border-radius: 2px; }
+  .bench::after { top: 6px; left: 4px; width: 4px; height: 12px; box-shadow: 38px 0 0 #8a5a34; }
+  body.phase-night .bench, body.phase-dusk .bench { filter: brightness(0.55); }
+
+  #lights {
+    position: absolute;
+    top: 4%;
+    left: 2%;
+    right: 2%;
+    height: 30px;
+    pointer-events: none;
+  }
+  .bulb {
+    position: absolute;
+    top: 10px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ffd76b;
+    opacity: 0.25;
+    transition: opacity 2s ease, box-shadow 2s ease;
+  }
+  body.phase-night .bulb, body.phase-dusk .bulb {
+    opacity: 1;
+    box-shadow: 0 0 10px 3px rgba(255, 215, 107, 0.85);
+  }
+
   .character {
     position: absolute;
     bottom: 6%;
     width: 96px;
     height: 96px;
     transform: translateX(-50%);
-    transition: left 1.4s linear;
+    transition: left 1.4s linear, opacity 1.5s ease;
     image-rendering: pixelated;
+    z-index: 5;
   }
   .character img {
     width: 100%;
     height: 100%;
     display: block;
+    transition: filter 1.5s ease;
   }
   .character.tablet img {
     opacity: 0.85;
     filter: drop-shadow(0 0 4px #6cf);
+  }
+  body.phase-night .character img, body.phase-dusk .character img {
+    filter: brightness(0.7) drop-shadow(0 0 6px rgba(120, 150, 255, 0.35));
+  }
+  .zzz {
+    position: absolute;
+    top: -14px;
+    right: -4px;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 1.5s ease;
+    animation: rise 3s ease-in-out infinite;
+  }
+  .zzz.visible { opacity: 0.9; }
+  @keyframes rise {
+    0% { transform: translateY(0); opacity: 0.3; }
+    50% { transform: translateY(-6px); opacity: 0.9; }
+    100% { transform: translateY(-12px); opacity: 0.3; }
   }
   .name {
     position: absolute;
@@ -44,6 +210,7 @@
     white-space: nowrap;
     text-shadow: 0 0 3px #fff, 0 0 3px #fff;
   }
+  body.phase-night .name, body.phase-dusk .name { color: #eef; text-shadow: 0 0 4px #000, 0 0 4px #000; }
   .bubble {
     position: absolute;
     bottom: 105px;
@@ -66,27 +233,171 @@
     right: 0;
     height: 1px;
     background: rgba(0,0,0,0.15);
+    z-index: 4;
   }
-  #status {
+  #hud {
     position: absolute;
-    top: 8px;
+    top: 10px;
     left: 12px;
+    display: flex;
+    gap: 8px;
+    z-index: 10;
+  }
+  #hud .pill {
     font-size: 12px;
-    color: #555;
+    color: #333;
+    background: rgba(255,255,255,0.65);
+    backdrop-filter: blur(3px);
+    padding: 4px 10px;
+    border-radius: 999px;
+  }
+  body.phase-night #hud .pill, body.phase-dusk #hud .pill {
+    color: #eef;
+    background: rgba(20, 25, 50, 0.55);
   }
 </style>
 </head>
 <body>
   <div id="room">
+    <div class="skylayer day"><div class="sky"></div><div class="ground"></div></div>
+    <div class="skylayer dawn"><div class="sky"></div><div class="ground"></div></div>
+    <div class="skylayer dusk"><div class="sky"></div><div class="ground"></div></div>
+    <div class="skylayer night"><div class="sky"></div><div class="ground"></div></div>
+
+    <div id="stars"></div>
+    <div class="celestial" id="sun"></div>
+    <div class="celestial" id="moon"></div>
+    <div id="cloudLayer"></div>
+    <div id="fireflyLayer"></div>
+    <div id="lights"></div>
+
+    <div id="decor"></div>
     <div id="floorLine"></div>
-    <div id="status">conectando…</div>
+
+    <div id="hud">
+      <div class="pill" id="status">conectando…</div>
+      <div class="pill" id="clock"></div>
+    </div>
   </div>
 
 <script>
 const room = document.getElementById('room');
 const statusEl = document.getElementById('status');
-const nodes = new Map(); // id -> {el, bubbleEl, lastSay}
+const clockEl = document.getElementById('clock');
+const nodes = new Map(); // id -> {el, bubbleEl, zzzEl, img, lastSay}
 const SAY_DURATION_MS = 8000;
+
+// ---------- Ambientacion fija (estrellas, nubes, luciernagas, arbolitos, luces, banco) ----------
+const starsEl = document.getElementById('stars');
+for (let i = 0; i < 60; i++) {
+  const s = document.createElement('div');
+  s.className = 'star';
+  s.style.left = Math.random() * 100 + '%';
+  s.style.top = Math.random() * 100 + '%';
+  s.style.animationDelay = (Math.random() * 3).toFixed(2) + 's';
+  starsEl.appendChild(s);
+}
+
+const cloudLayer = document.getElementById('cloudLayer');
+for (let i = 0; i < 4; i++) {
+  const c = document.createElement('div');
+  c.className = 'cloud';
+  c.style.top = (5 + Math.random() * 18) + '%';
+  c.style.animationDuration = (50 + Math.random() * 40) + 's';
+  c.style.animationDelay = -(Math.random() * 60) + 's';
+  cloudLayer.appendChild(c);
+}
+
+const fireflyLayer = document.getElementById('fireflyLayer');
+for (let i = 0; i < 10; i++) {
+  const f = document.createElement('div');
+  f.className = 'firefly';
+  f.style.left = (10 + Math.random() * 80) + '%';
+  f.style.top = (55 + Math.random() * 30) + '%';
+  f.style.animationDelay = -(Math.random() * 6) + 's';
+  fireflyLayer.appendChild(f);
+}
+
+const lightsEl = document.getElementById('lights');
+for (let i = 0; i < 14; i++) {
+  const b = document.createElement('div');
+  b.className = 'bulb';
+  b.style.left = (i * (100 / 13)) + '%';
+  b.style.animationDelay = (Math.random() * 2).toFixed(2) + 's';
+  lightsEl.appendChild(b);
+}
+
+const decor = document.getElementById('decor');
+[6, 88, 94].forEach((leftPercent, i) => {
+  const t = document.createElement('div');
+  t.className = 'tree';
+  t.style.left = leftPercent + '%';
+  t.style.transform = 'scale(' + (0.9 + (i % 2) * 0.3) + ')';
+  t.innerHTML = '<div class="leaves"></div><div class="trunk"></div>';
+  decor.appendChild(t);
+});
+const bench = document.createElement('div');
+bench.className = 'bench';
+bench.style.left = '78%';
+decor.appendChild(bench);
+
+// ---------- Ciclo dia/noche segun la hora real ----------
+const PHASES = ['night', 'dawn', 'day', 'dusk'];
+function phaseAt(hourFloat) {
+  if (hourFloat >= 6 && hourFloat < 8) return 'dawn';
+  if (hourFloat >= 8 && hourFloat < 18) return 'day';
+  if (hourFloat >= 18 && hourFloat < 20) return 'dusk';
+  return 'night';
+}
+
+function updateSky() {
+  const now = new Date();
+  const h = now.getHours() + now.getMinutes() / 60;
+  const phase = phaseAt(h);
+
+  document.querySelectorAll('.skylayer').forEach((el) => {
+    el.classList.toggle('active', el.classList.contains(phase));
+  });
+  PHASES.forEach((p) => document.body.classList.toggle('phase-' + p, p === phase));
+
+  const isNight = phase === 'night';
+  const isDusk = phase === 'dusk';
+  starsEl.classList.toggle('visible', isNight);
+  document.querySelectorAll('.firefly').forEach((f) => f.classList.toggle('visible', isNight));
+  document.querySelectorAll('.cloud').forEach((c) => c.classList.toggle('visible', phase === 'day' || phase === 'dawn'));
+
+  // Sol visible de 6 a 20, arco de izquierda a derecha con altura tipo parabola.
+  const sunEl = document.getElementById('sun');
+  const moonEl = document.getElementById('moon');
+  const sunActive = h >= 6 && h < 20;
+  sunEl.classList.toggle('visible', sunActive);
+  moonEl.classList.toggle('visible', !sunActive);
+  if (sunActive) {
+    const f = (h - 6) / 14;
+    sunEl.style.left = (8 + f * 84) + '%';
+    sunEl.style.top = (55 - Math.sin(f * Math.PI) * 45) + '%';
+  } else {
+    const nh = h < 6 ? h + 24 : h;
+    const f = (nh - 20) / 10;
+    moonEl.style.left = (8 + f * 84) + '%';
+    moonEl.style.top = (55 - Math.sin(f * Math.PI) * 45) + '%';
+  }
+
+  clockEl.textContent = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) +
+    ' · ' + ({ night: 'Noche', dawn: 'Amanecer', day: 'Dia', dusk: 'Atardecer' })[phase];
+
+  return { phase, isNight, isDusk };
+}
+let currentAmbience = updateSky();
+setInterval(() => { currentAmbience = updateSky(); }, 30000);
+
+// ---------- Personajes ----------
+function poseForAmbience(hasBubble) {
+  if (hasBubble) return 'stand01';
+  if (currentAmbience.isNight) return 'lay01';
+  if (currentAmbience.isDusk) return 'sit01';
+  return 'stand01';
+}
 
 function ensureNode(peer) {
   let entry = nodes.get(peer.id);
@@ -108,8 +419,13 @@ function ensureNode(peer) {
   bubble.className = 'bubble';
   el.appendChild(bubble);
 
+  const zzz = document.createElement('div');
+  zzz.className = 'zzz';
+  zzz.textContent = '💤';
+  el.appendChild(zzz);
+
   room.appendChild(el);
-  entry = { el, bubble, lastSay: null, sayUntil: 0 };
+  entry = { el, bubble, zzz, img, lastSay: null, sayUntil: 0, pose: 'stand01' };
   nodes.set(peer.id, entry);
   return entry;
 }
@@ -127,12 +443,20 @@ function render(peers) {
       entry.lastSay = peer.lastSay;
       entry.sayUntil = Date.now() + SAY_DURATION_MS;
     }
-    if (peer.lastSay && Date.now() < entry.sayUntil) {
+    const talking = peer.lastSay && Date.now() < entry.sayUntil;
+    if (talking) {
       entry.bubble.textContent = peer.lastSay;
       entry.bubble.style.display = 'block';
     } else {
       entry.bubble.style.display = 'none';
     }
+
+    const desiredPose = poseForAmbience(talking);
+    if (desiredPose !== entry.pose) {
+      entry.pose = desiredPose;
+      entry.img.src = '/sprites/' + encodeURIComponent(peer.id) + '/' + desiredPose + '.png';
+    }
+    entry.zzz.classList.toggle('visible', desiredPose === 'lay01');
   }
   for (const [id, entry] of nodes) {
     if (!seen.has(id)) {

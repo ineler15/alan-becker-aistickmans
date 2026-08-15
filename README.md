@@ -15,7 +15,7 @@ archivos, abrir programas, etc. Incluye una app Android complementaria y una pag
 ## Instalacion
 
 ```bash
-git clone https://github.com/<tu-usuario>/alan-becker-aistickmans.git
+git clone https://github.com/ineler15/alan-becker-aistickmans.git
 cd alan-becker-aistickmans
 npm install
 ```
