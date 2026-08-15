@@ -4,17 +4,17 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Handler
-import android.os.IBinder
 import android.os.Looper
 import androidx.core.app.NotificationCompat
+import androidx.lifecycle.LifecycleService
 import com.stickmanai.android.MainActivity
 import com.stickmanai.android.Prefs
 import com.stickmanai.android.R
+import com.stickmanai.android.ai.CameraCapture
 import com.stickmanai.android.ai.GeminiClient
 import com.stickmanai.android.ai.PcBridge
 import com.stickmanai.android.ai.PcPeersResult
@@ -33,7 +33,7 @@ import org.json.JSONObject
  * a fast one (~40ms) that steps physics/animation, and a slow one (~6s, matching the desktop
  * app's TICK_INTERVAL_SECONDS) that asks Gemini what each character should do next.
  */
-class OverlayService : Service() {
+class OverlayService : LifecycleService() {
 
     companion object {
         const val CHANNEL_ID = "overlay_service"
@@ -54,8 +54,9 @@ class OverlayService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.Default + Job())
     private val mainHandler = Handler(Looper.getMainLooper())
     private var physicsRunning = false
-
-    override fun onBind(intent: Intent?): IBinder? = null
+    // LifecycleService (this) doubles as the LifecycleOwner CameraX binds to - one shared
+    // capture per AI tick round, same idea as the desktop's single shared screenshot per tick.
+    private val cameraCapture by lazy { CameraCapture(this, this) }
 
     override fun onCreate() {
         super.onCreate()
@@ -63,6 +64,7 @@ class OverlayService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        super.onStartCommand(intent, flags, startId)
         startForeground(1, buildNotification())
         setupOverlays()
         startPhysicsLoop()
@@ -72,13 +74,13 @@ class OverlayService : Service() {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
         physicsRunning = false
         serviceScope.cancel()
         overlays.values.forEach { it.detach() }
         overlays.clear()
         pcGhosts.values.forEach { it.detach() }
         pcGhosts.clear()
+        super.onDestroy()
     }
 
     private fun setupOverlays() {
@@ -116,8 +118,12 @@ class OverlayService : Service() {
     private fun startAiLoop() {
         serviceScope.launch {
             while (true) {
+                // One shared camera frame per round, reused by every character this tick -
+                // mirrors the desktop's "one shared screenshot per round" in agentLoop.js so the
+                // cost doesn't multiply with the number of friends.
+                val cameraBase64 = cameraCapture.captureBase64()
                 for (overlay in overlays.values.toList()) {
-                    tickCharacterAi(overlay)
+                    tickCharacterAi(overlay, cameraBase64)
                 }
                 delay(TICK_INTERVAL_MS)
             }
@@ -163,7 +169,7 @@ class OverlayService : Service() {
         }
     }
 
-    private suspend fun tickCharacterAi(overlay: CharacterOverlay) {
+    private suspend fun tickCharacterAi(overlay: CharacterOverlay, cameraBase64: String?) {
         val characterId = overlay.def.id
         val apiKey = Prefs.apiKeyFor(this, characterId)
         if (apiKey.isBlank()) return
@@ -187,6 +193,7 @@ class OverlayService : Service() {
                 peers = peers,
                 userMessage = userMessage,
                 forceSay = silentStreak >= SILENT_TURN_LIMIT,
+                cameraBase64 = cameraBase64,
             )
             turnsSinceSay[characterId] = if (decision.tool == "say") 0 else silentStreak + 1
             mainHandler.post { applyDecision(overlay, decision.tool, decision.args) }

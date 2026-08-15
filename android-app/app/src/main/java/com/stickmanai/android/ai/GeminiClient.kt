@@ -18,8 +18,9 @@ data class PeerInfo(val id: String, val displayName: String, val x: Int?, val la
 
 /**
  * Same OpenAI-compatible Gemini endpoint and tool-forcing trick as the desktop
- * src/ai/geminiProvider.js, trimmed to mobile's smaller tool set and no image context -
- * there's no screen/webcam capture on this port, just proprioceptive state and chat.
+ * src/ai/geminiProvider.js, trimmed to mobile's smaller tool set. Optionally carries a front-camera
+ * frame (see CameraCapture) the same way the desktop attaches its webcam frame - there's no
+ * screen capture on this port, just the camera and proprioceptive state/chat.
  */
 object GeminiClient {
 
@@ -52,6 +53,11 @@ object GeminiClient {
         del otro lado que puede escribirte en cualquier momento.
         Vos y tus amigos son personajes masculinos (el, no ella). Hablen en espanol neutro, sin
         "vos" argentino ni "tu" con acento particular forzado - un espanol simple y neutro.
+        A veces recibis ademas una foto de la camara frontal del celular - es la persona real
+        que tenes en frente, no un dibujo. Si la recibis, podes comentar con humor algo que veas
+        de ella o de su entorno, igual que comentarias algo en pantalla, pero sin ser invasivo ni
+        incomodo (nada sobre su aspecto fisico en detalle - mejor cosas como su expresion, si esta
+        sonriendo, si hay algo curioso alrededor, etc.).
     """.trimIndent()
 
     private val client = OkHttpClient.Builder()
@@ -68,6 +74,7 @@ object GeminiClient {
         peers: List<PeerInfo>,
         userMessage: String?,
         forceSay: Boolean,
+        cameraBase64: String? = null,
     ): Decision = withContext(Dispatchers.IO) {
         val contextJson = JSONObject()
             .put("xPercent", xPercent)
@@ -97,6 +104,21 @@ object GeminiClient {
                 }
             }
 
+        // Same shape as the desktop's userContent array: plain text when there's no camera
+        // frame, or a text+image_url array when there is - the endpoint accepts either.
+        val userContent: Any = if (cameraBase64 != null) {
+            JSONArray()
+                .put(JSONObject().put("type", "text").put("text", contextJson.toString()))
+                .put(
+                    JSONObject().put("type", "image_url").put(
+                        "image_url",
+                        JSONObject().put("url", "data:image/jpeg;base64,$cameraBase64"),
+                    )
+                )
+        } else {
+            contextJson.toString()
+        }
+
         val messages = JSONArray()
             .put(
                 JSONObject().put("role", "system").put(
@@ -104,7 +126,7 @@ object GeminiClient {
                     if (personality.isNotBlank()) "$SYSTEM_PROMPT\n\n$personality" else SYSTEM_PROMPT
                 )
             )
-            .put(JSONObject().put("role", "user").put("content", contextJson.toString()))
+            .put(JSONObject().put("role", "user").put("content", userContent))
 
         val body = JSONObject()
             .put("model", MODEL)
