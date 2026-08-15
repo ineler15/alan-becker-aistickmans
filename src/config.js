@@ -1,9 +1,19 @@
 const path = require('path');
 const fs = require('fs');
+const { app } = require('electron');
 require('dotenv').config();
 
 const ROOT_DIR = path.join(__dirname, '..');
-const WORKSPACE_DIR = path.resolve(ROOT_DIR, process.env.WORKSPACE_DIR || './workspace');
+// In a packaged build, ROOT_DIR resolves to inside app.asar - a single read-only file, not a
+// real directory, so creating a workspace folder "inside" it fails with ENOTDIR. Default to
+// Electron's writable per-user data dir there instead; dev (unpackaged) keeps using the
+// project folder like before.
+const DEFAULT_WORKSPACE_DIR = app.isPackaged
+  ? path.join(app.getPath('userData'), 'workspace')
+  : path.join(ROOT_DIR, 'workspace');
+const WORKSPACE_DIR = process.env.WORKSPACE_DIR
+  ? path.resolve(ROOT_DIR, process.env.WORKSPACE_DIR)
+  : DEFAULT_WORKSPACE_DIR;
 
 if (!fs.existsSync(WORKSPACE_DIR)) {
   fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
