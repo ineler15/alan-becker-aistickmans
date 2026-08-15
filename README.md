@@ -65,6 +65,25 @@ Shimeji sobre tu escritorio.
 - `Control+Shift+H`: abrir la ventana de chat con un personaje
 - Pagina web en vivo: http://localhost:8787/home (mientras la app este corriendo)
 
+## Control de PC y Android
+
+Cada personaje puede controlar de verdad el dispositivo donde corre, no solo moverse y hablar:
+
+**PC** (`src/ai/actions.schema.js` / `src/actions/`):
+- `open_app` - abre un programa o una pagina web (o una busqueda de Google armando la URL).
+- `move_mouse` + `click`, o `tap(x, y)` - mueve y clickea en un solo paso, como tocar una pantalla.
+- `type_text` - escribe con el teclado.
+- `run_command`, `write_file`, `delete_file`, `close_app` - piden confirmacion por dialogo antes
+  de ejecutarse (ver `src/safety/confirm.js`) si el archivo esta fuera de `workspace/`.
+
+**Android** (`android-app/.../ai/ActionsSchema.kt`):
+- `open_app` - abre una URL en el navegador del celular.
+- `tap(x, y)` - toca la pantalla (otras apps incluidas) en una posicion 0-100% del ancho/alto.
+
+`tap` en Android necesita un permiso especial que no se puede activar solo: abri la app, toca
+**"Permitir que toquen la pantalla"** y habilita "Stickman AI" en Ajustes > Accesibilidad. Sin ese
+permiso, `tap` simplemente no hace nada (no rompe nada, el personaje sigue funcionando igual).
+
 ## Estructura
 
 - `main.js` / `src/` - proceso principal de Electron (loop de IA, acciones, memoria)

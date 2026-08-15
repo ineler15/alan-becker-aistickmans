@@ -38,6 +38,14 @@ const ACTIONS = [
     risky: false,
   },
   { name: 'click', desc: 'Hace click con el mouse en la posicion actual', params: { button: 'string (left|right|middle, opcional)' }, risky: false },
+  {
+    name: 'tap',
+    desc:
+      'Mueve el mouse a x,y y hace click ahi mismo, en un solo paso (en vez de move_mouse y ' +
+      'despues click por separado). Usalo cuando ya sabes exactamente donde clickear.',
+    params: { x: 'number', y: 'number', button: 'string (left|right|middle, opcional)' },
+    risky: false,
+  },
   { name: 'type_text', desc: 'Escribe texto usando el teclado', params: { text: 'string' }, risky: false },
   { name: 'open_paint', desc: 'Abre o enfoca StickPaint, tu propio lienzo de dibujo', params: {}, risky: false },
   {

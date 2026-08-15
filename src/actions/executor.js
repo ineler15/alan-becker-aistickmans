@@ -36,6 +36,9 @@ async function execute(name, args, characterId) {
       return { ok: true, result: 'orden enviada: subirse al cursor del mouse' };
     case 'click':
       return { ok: true, result: await input.click(args.button) };
+    case 'tap':
+      await input.tap(args.x, args.y, args.button);
+      return { ok: true, result: `tap en (${args.x}, ${args.y})` };
     case 'type_text':
       return { ok: true, result: await input.typeText(args.text) };
     case 'open_paint':

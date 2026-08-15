@@ -13,7 +13,9 @@ import androidx.camera.core.ImageProxy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import kotlin.coroutines.resume
 
@@ -58,31 +60,36 @@ class CameraCapture(private val context: Context, private val lifecycleOwner: Li
     /** Returns a base64 JPEG of one frame, or null if there's no permission/camera/failure. */
     suspend fun captureBase64(): String? {
         if (!hasPermission()) return null
-        if (!ensureBound()) return null
-        val capture = imageCapture ?: return null
+        // CameraX's bindToLifecycle (inside ensureBound) requires the main thread - the AI loop
+        // that calls this runs on Dispatchers.Default, so without this switch bindToLifecycle
+        // silently throws (caught below as a warning) and the camera never actually starts.
+        return withContext(Dispatchers.Main) {
+            if (!ensureBound()) return@withContext null
+            val capture = imageCapture ?: return@withContext null
 
-        return suspendCancellableCoroutine { cont ->
-            capture.takePicture(
-                ContextCompat.getMainExecutor(context),
-                object : ImageCapture.OnImageCapturedCallback() {
-                    override fun onCaptureSuccess(image: ImageProxy) {
-                        val result = try {
-                            encodeJpeg(image)
-                        } catch (e: Exception) {
-                            android.util.Log.w("StickmanAI", "no se pudo procesar el frame de camara", e)
-                            null
-                        } finally {
-                            image.close()
+            suspendCancellableCoroutine { cont ->
+                capture.takePicture(
+                    ContextCompat.getMainExecutor(context),
+                    object : ImageCapture.OnImageCapturedCallback() {
+                        override fun onCaptureSuccess(image: ImageProxy) {
+                            val result = try {
+                                encodeJpeg(image)
+                            } catch (e: Exception) {
+                                android.util.Log.w("StickmanAI", "no se pudo procesar el frame de camara", e)
+                                null
+                            } finally {
+                                image.close()
+                            }
+                            cont.resume(result)
                         }
-                        cont.resume(result)
-                    }
 
-                    override fun onError(exception: ImageCaptureException) {
-                        android.util.Log.w("StickmanAI", "fallo captura de camara", exception)
-                        cont.resume(null)
-                    }
-                },
-            )
+                        override fun onError(exception: ImageCaptureException) {
+                            android.util.Log.w("StickmanAI", "fallo captura de camara", exception)
+                            cont.resume(null)
+                        }
+                    },
+                )
+            }
         }
     }
 
