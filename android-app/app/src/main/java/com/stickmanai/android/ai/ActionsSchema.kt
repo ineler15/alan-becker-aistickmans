@@ -5,8 +5,10 @@ import org.json.JSONObject
 
 /**
  * Trimmed version of src/ai/actions.schema.js for the mobile port - no desktop automation
- * (Paint/Notepad/files/click/type_text) since there's no such surface on Android, just
- * movement, speech, emotion and the same self-personality/memory tools.
+ * (Paint/Notepad/files/type_text) since there's no such surface on Android, just movement,
+ * speech, emotion, the same self-personality/memory tools, and two device-control actions that
+ * mirror the desktop's open_app/click: open_app (launch a URL) and tap (touch the screen via
+ * TapAccessibilityService).
  */
 object ActionsSchema {
 
@@ -82,5 +84,26 @@ object ActionsSchema {
             )
         )
         put(tool("wait", "No haces nada este turno. Reservalo para turnos excepcionales.", JSONObject()))
+        put(
+            tool(
+                "open_app",
+                "Abre una pagina web en el navegador del celular. Para buscar algo en Google, " +
+                    "arma vos mismo la URL: https://www.google.com/search?q=tu+busqueda+aqui",
+                JSONObject().put("url", prop("string", "URL completa a abrir")),
+                listOf("url")
+            )
+        )
+        put(
+            tool(
+                "tap",
+                "Toca la pantalla del celular en una posicion (0-100% del ancho y alto), como si " +
+                    "fuera un dedo. Requiere que el usuario haya habilitado el permiso de accesibilidad; " +
+                    "si no, no pasa nada. Usalo con cuidado y solo cuando de verdad tenga sentido tocar algo puntual.",
+                JSONObject()
+                    .put("x", prop("number", "Posicion horizontal, 0-100% del ancho"))
+                    .put("y", prop("number", "Posicion vertical, 0-100% del alto")),
+                listOf("x", "y")
+            )
+        )
     }
 }

@@ -223,7 +223,28 @@ class OverlayService : LifecycleService() {
             "say" -> overlay.say(args.optString("text", ""))
             "define_personality" -> Prefs.setPersonality(this, overlay.def.id, args.optString("description", ""))
             "remember" -> Prefs.addMemory(this, overlay.def.id, args.optString("note", ""))
+            "open_app" -> openUrl(args.optString("url", ""))
+            "tap" -> {
+                val xPct = args.optDouble("x", 50.0).coerceIn(0.0, 100.0)
+                val yPct = args.optDouble("y", 50.0).coerceIn(0.0, 100.0)
+                com.stickmanai.android.input.TapAccessibilityService.tapAt(
+                    (xPct / 100 * metrics.widthPixels).toFloat(),
+                    (yPct / 100 * metrics.heightPixels).toFloat(),
+                )
+            }
             "wait" -> { /* no-op */ }
+        }
+    }
+
+    private fun openUrl(url: String) {
+        if (url.isBlank()) return
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            android.util.Log.w("StickmanAI", "no se pudo abrir la URL: $url", e)
         }
     }
 

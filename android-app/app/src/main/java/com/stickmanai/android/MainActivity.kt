@@ -45,6 +45,16 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        binding.btnGrantAccessibility.setOnClickListener {
+            if (com.stickmanai.android.input.TapAccessibilityService.isEnabled) {
+                Toast.makeText(this, "Ya habilitado", Toast.LENGTH_SHORT).show()
+            } else {
+                // No per-service API to check/request this directly - just send the user to the
+                // general Accessibility settings screen where they enable "Stickman AI" by hand.
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+        }
+
         binding.btnStart.setOnClickListener { startOverlayService() }
         binding.btnStop.setOnClickListener { stopService(Intent(this, OverlayService::class.java)) }
 
