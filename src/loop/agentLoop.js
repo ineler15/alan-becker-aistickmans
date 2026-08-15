@@ -10,6 +10,7 @@ const selfPersonality = require('../memory/selfPersonality');
 const notes = require('../memory/notes');
 const webcam = require('./webcam');
 const peerServer = require('../net/peerServer');
+const health = require('./health');
 
 let paused = true;
 let timer = null;
@@ -161,9 +162,11 @@ async function tickCharacter(character, perception, userMessageText) {
     if (tool === 'remember' && ok && typeof result === 'string' && result.trim()) {
       notes.add(characterId, result.trim());
     }
+    health.setOk(characterId);
   } catch (err) {
     const errorMessage = String(err && err.message ? err.message : err);
     history.add(characterId, { tool: 'error', args: {}, ok: false, result: errorMessage });
+    health.setError(characterId, errorMessage);
 
     // A failed decide()/execute() (rate limit, timeout, etc.) shouldn't leave the
     // character frozen - walk somewhere so there's still visible life on a bad turn.

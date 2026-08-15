@@ -153,12 +153,20 @@ class CharacterOverlay(
         if (isEmpty()) sprites.stand else this[i % size]
 
     private fun render() {
-        // Clamp the visible feet position above the keyboard when it's up - the underlying
-        // physics (state.x/state.y) keeps running normally, only where it's drawn changes, so
-        // walking/dragging behavior is unaffected once the keyboard closes again.
-        val feetY = if (keyboardInsetPx > 0) minOf(state.y, screenHeight - keyboardInsetPx) else state.y
+        // Just lifting the character above the keyboard still parks it right at the keyboard's
+        // top edge - exactly where a text field being typed into usually sits, so it kept
+        // covering the very thing the user was writing in. Hiding it outright while the
+        // keyboard is up is the only way to guarantee it's never "in the way" of typing; the
+        // underlying physics (state.x/state.y) keeps running so it resumes normally once the
+        // keyboard closes.
+        if (keyboardInsetPx > 0) {
+            imageView.visibility = View.GONE
+            speechView.visibility = View.GONE
+            return
+        }
+        imageView.visibility = View.VISIBLE
         imageParams.x = state.x - sizePx / 2
-        imageParams.y = feetY - sizePx
+        imageParams.y = state.y - sizePx
         windowManager.updateViewLayout(imageView, imageParams)
 
         if (state.speechText != null) {

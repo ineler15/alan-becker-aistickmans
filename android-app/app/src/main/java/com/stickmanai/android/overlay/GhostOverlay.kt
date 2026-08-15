@@ -3,6 +3,7 @@ package com.stickmanai.android.overlay
 import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.Rect
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
@@ -21,6 +22,11 @@ class GhostOverlay(context: Context, private val windowManager: WindowManager, c
     private val sizePx = (128 * density).toInt()
     private var lastSayShown: String? = null
     private var sayUntil = 0L
+    private var screenHeight = 0
+    // Same reasoning as CharacterOverlay: a ghost parked at a fixed floor position would sit
+    // right where a text field usually is once the keyboard is up, so it's hidden outright
+    // instead of just repositioned.
+    private var keyboardInsetPx = 0
 
     private val imageView = ImageView(context).apply {
         setImageBitmap(sprites.stand)
@@ -51,6 +57,13 @@ class GhostOverlay(context: Context, private val windowManager: WindowManager, c
     fun attach() {
         windowManager.addView(imageView, imageParams)
         windowManager.addView(speechView, speechParams)
+        imageView.viewTreeObserver.addOnGlobalLayoutListener {
+            if (screenHeight == 0) return@addOnGlobalLayoutListener
+            val rect = Rect()
+            imageView.getWindowVisibleDisplayFrame(rect)
+            val covered = screenHeight - rect.bottom
+            keyboardInsetPx = if (covered > screenHeight * 0.15) covered else 0
+        }
     }
 
     fun detach() {
@@ -60,6 +73,13 @@ class GhostOverlay(context: Context, private val windowManager: WindowManager, c
 
     /** floorY/screenWidthPx are this tablet's own metrics; xPercent (0-100) came from the PC's own screen width. */
     fun update(xPercent: Int, screenWidthPx: Int, floorY: Int, lastSay: String?) {
+        screenHeight = floorY + (48 * density).toInt()
+        if (keyboardInsetPx > 0) {
+            imageView.visibility = View.GONE
+            speechView.visibility = View.GONE
+            return
+        }
+        imageView.visibility = View.VISIBLE
         val x = (xPercent / 100.0 * screenWidthPx).toInt()
         imageParams.x = x - sizePx / 2
         imageParams.y = floorY - sizePx

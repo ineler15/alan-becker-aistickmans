@@ -6,7 +6,34 @@
   "private": true,
   "scripts": {
     "build": "tsc",
-    "start": "npm run build && electron ."
+    "start": "npm run build && electron .",
+    "dist": "npm run build && electron-builder --win nsis"
+  },
+  "build": {
+    "npmRebuild": false,
+    "appId": "com.stickmanai.desktop",
+    "productName": "Alan Becker AIStickmans",
+    "icon": "build/icon.png",
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json",
+      "dist/**/*",
+      "src/**/*",
+      "renderer/**/*",
+      "node_modules/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    }
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.0",
@@ -19,6 +46,7 @@
   "devDependencies": {
     "@types/node": "^20.19.43",
     "electron": "^32.0.0",
+    "electron-builder": "^26.15.3",
     "typescript": "^5.9.3"
   }
 }

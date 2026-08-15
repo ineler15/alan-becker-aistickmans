@@ -121,14 +121,25 @@ async function decide(context) {
       ],
     }),
   });
-  const data = await res.json();
-  if (data.error) {
-    console.error('[geminiProvider] API error:', res.status, data.error.message || data.error);
-    throw new Error(`gemini API error (${res.status}): ${data.error.message || JSON.stringify(data.error)}`);
+  const rawText = await res.text();
+  let data;
+  try {
+    data = JSON.parse(rawText);
+  } catch {
+    console.error('[geminiProvider] respuesta no-JSON:', res.status, rawText.slice(0, 500));
+    return { tool: 'wait', args: {} };
+  }
+  // Algunos errores (ej. 429 de cuota) vienen envueltos en un array [{error:...}]
+  // en vez de {error:...} - sin este chequeo pasaban desapercibidos y caian
+  // silenciosamente al fallback de "wait" en vez de mostrar el error real.
+  const errorPayload = Array.isArray(data) ? data[0]?.error : data.error;
+  if (errorPayload) {
+    console.error(`[geminiProvider:${characterId}] API error:`, res.status, errorPayload.message || errorPayload);
+    throw new Error(`gemini API error (${res.status}): ${errorPayload.message || JSON.stringify(errorPayload)}`);
   }
   const call = data.choices?.[0]?.message?.tool_calls?.[0];
   if (!call) {
-    console.warn('[geminiProvider] respuesta sin tool_calls, se usa wait:', JSON.stringify(data.choices?.[0]?.message));
+    console.warn(`[geminiProvider:${characterId}] respuesta sin tool_calls, se usa wait:`, res.status, rawText.slice(0, 1000));
     return { tool: 'wait', args: {} };
   }
   return { tool: call.function.name, args: JSON.parse(call.function.arguments || '{}') };

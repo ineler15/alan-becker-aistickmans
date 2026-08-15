@@ -6,6 +6,7 @@ const shimeji = require('../../dist/shimejiController');
 const history = require('../memory/history');
 const config = require('../config');
 const CHARACTERS = require('../characters');
+const health = require('../loop/health');
 
 // Lets the Android port, this desktop app and a browser "home" page all see (and render) each
 // other's characters - same lightweight visibility (position + last thing said) that characters
@@ -21,7 +22,7 @@ let remoteReceivedAt = 0;
 let remoteScreenWidth = 0;
 
 function localPeersPayload() {
-  return CHARACTERS.map((c) => {
+  return CHARACTERS.filter((c) => health.isOk(c.id)).map((c) => {
     const status = shimeji.readStatus(c.id);
     const lastAction = history.recent(c.id, 1)[0] || null;
     return {

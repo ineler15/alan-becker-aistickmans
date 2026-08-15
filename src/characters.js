@@ -8,6 +8,9 @@
 //
 // Personalidad vacia a proposito en todos: cada uno se define solo con la accion
 // define_personality (ver agentLoop.js) y queda guardado en workspace/personality-<id>.json.
+// Purple, AI, TCO, TDL y victim quedaron afuera a proposito: comparten keys de Gemini con la
+// cuota gratuita agotada (ver .env) y solo terminaban en el fallback de move_random sin IA real.
+// Agregalos de nuevo aca (con su key nueva en .env) cuando tengan cuota disponible.
 const CHARACTERS = [
   { id: 'Red', displayName: 'Red', personality: '' },
   {
@@ -16,14 +19,9 @@ const CHARACTERS = [
     displayName: 'The Second Coming',
     personality: '',
   },
-  { id: 'Purple', displayName: 'Purple', personality: '' },
   { id: 'Green', displayName: 'Green', personality: '' },
   { id: 'Blue', displayName: 'Blue', personality: '' },
   { id: 'Yellow', displayName: 'Yellow', personality: '' },
-  { id: 'AI', displayName: 'AI', personality: '' },
-  { id: 'TCO', displayName: 'TCO', personality: '' },
-  { id: 'TDL', displayName: 'TDL', personality: '' },
-  { id: 'victim', displayName: 'victim', personality: '' },
 ];
 
 module.exports = CHARACTERS;
