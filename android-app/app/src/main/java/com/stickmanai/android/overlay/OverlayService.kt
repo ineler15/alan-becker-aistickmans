@@ -175,6 +175,11 @@ class OverlayService : LifecycleService() {
         val characterId = overlay.def.id
         val apiKey = Prefs.apiKeyFor(this, characterId)
         if (apiKey.isBlank()) return
+        // Skip the AI call entirely while asleep - saves quota, and a sleeping character
+        // shouldn't be deciding to do anything anyway. It wakes up on its own after
+        // CharacterState.SLEEP_DURATION_MS or if the user drags/pinches it; any message that
+        // arrives meanwhile is left in PendingMessages for the next successful (awake) turn.
+        if (overlay.state.sleeping) return
         val metrics = resources.displayMetrics
         val userMessage = PendingMessages.consume(characterId)
         val silentStreak = turnsSinceSay[characterId] ?: 0
@@ -225,7 +230,7 @@ class OverlayService : LifecycleService() {
             "move_random" -> overlay.state.randomTarget(args.optBoolean("run", false))
             "set_animation" -> {
                 val state = args.optString("state", "idle")
-                val validStates = setOf("happy", "trip", "sad", "scared", "sit")
+                val validStates = setOf("happy", "trip", "sad", "scared", "sit", "tired", "sleep")
                 overlay.state.setEmotion(if (state in validStates) state else null)
             }
             "say" -> {

@@ -148,6 +148,31 @@ object PoseLibrary {
         )
     }
 
+    /** Tired: slumped sitting, arms hanging - matches desktop's "tired"/couch01 semantics. */
+    val TIRED: Pose = mapOf(
+        BonePaths.TORSO_LOWER to REST_TORSO_LOWER - 30f,
+        BonePaths.ARM1 to REST_ARM1 - 20f,
+        BonePaths.ARM2 to REST_ARM2 + 20f,
+        BonePaths.LEG1 to REST_LEG1 + 15f,
+        BonePaths.LEG1_SHIN to REST_LEG1_SHIN + 40f,
+        BonePaths.LEG2 to REST_LEG2 - 15f,
+        BonePaths.LEG2_SHIN to REST_LEG2_SHIN + 40f,
+    )
+
+    /** Asleep: legs straightened together, arms relaxed, a slow "breathing" sway - the view itself gets rotated 90 to lie flat, see CharacterOverlay. */
+    private fun sleepPose(frame: Int): Pose {
+        val breathe = 4f * sin(TWO_PI * frame / 20f)
+        return mapOf(
+            BonePaths.LEG1 to REST_LEG1 + 10f,
+            BonePaths.LEG1_SHIN to REST_LEG1_SHIN * 0.2f,
+            BonePaths.LEG2 to REST_LEG2 - 10f,
+            BonePaths.LEG2_SHIN to REST_LEG2_SHIN * 0.2f,
+            BonePaths.ARM1 to REST_ARM1 + breathe,
+            BonePaths.ARM2 to REST_ARM2 - breathe,
+            BonePaths.TORSO_LOWER to REST_TORSO_LOWER + breathe * 0.5f,
+        )
+    }
+
     // The bone paths above are hardcoded for Red's specific topology (mapped out by hand - see
     // sn_proto_wasm_renderer memory) and only hold for a rig sharing that exact bone tree shape.
     // Blue/Green/Yellow are confirmed (by comparing each rig's node_type tree shape) to share
@@ -170,6 +195,8 @@ object PoseLibrary {
             is CharacterState.FrameKind.Pinch -> pinchPose(kind.frame)
             is CharacterState.FrameKind.Angry -> angryPose(kind.frame)
             is CharacterState.FrameKind.Climb -> climbPose(kind.frame)
+            is CharacterState.FrameKind.Sleep -> sleepPose(kind.frame)
+            is CharacterState.FrameKind.Tired -> TIRED
         }
     }
 }

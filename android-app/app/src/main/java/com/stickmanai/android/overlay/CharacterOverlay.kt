@@ -151,13 +151,20 @@ class CharacterOverlay(
                 is CharacterState.FrameKind.Trip -> sprites!!.trip.frameAt(kind.frame)
                 // No sprite art for these - sprite-backed characters just stand instead.
                 is CharacterState.FrameKind.Sit, is CharacterState.FrameKind.Angry,
-                is CharacterState.FrameKind.Climb -> sprites!!.stand
+                is CharacterState.FrameKind.Climb, is CharacterState.FrameKind.Sleep,
+                is CharacterState.FrameKind.Tired -> sprites!!.stand
             }
             (characterView as ImageView).setImageBitmap(bitmap)
         }
         if (state.climbing) {
             // Rotate to cling to the wall - head points away from the wall it's climbing.
             characterView.rotation = if (state.climbSide < 0) 90f else -90f
+            characterView.scaleX = 1f
+        } else if (state.sleeping) {
+            // Lie flat on the ground instead of standing - reuses the same rotation trick as
+            // climbing, just always to one side since "which way is down" doesn't depend on
+            // anything here.
+            characterView.rotation = 90f
             characterView.scaleX = 1f
         } else {
             characterView.rotation = 0f

@@ -36,6 +36,35 @@ const repeatStreakById = new Map();
 const turnsSinceSayById = new Map();
 const SILENT_TURN_LIMIT = 3;
 
+// Automatic tiredness/sleep - forces the existing sleep/tired set_animation states (see
+// actions.schema.js and AIBehavior.java's applyStaticPose) after being awake too long, sooner at
+// night, instead of only when the model itself decides to. Java has no auto-wake timer for these
+// (no equivalent of its sayUntil/rideCursorUntil fields), so tracking sleep duration and waking
+// back up both happen here on the JS side. Mirrors the same thresholds used on the Android port.
+const awakeSinceById = new Map();
+const sleepStartedAtById = new Map();
+const AWAKE_MS_BEFORE_SLEEP = 20 * 60 * 1000;
+const AWAKE_MS_BEFORE_SLEEP_AT_NIGHT = 10 * 60 * 1000;
+const SLEEP_DURATION_MS = 5 * 60 * 1000;
+const NIGHT_START_HOUR = 22;
+const NIGHT_END_HOUR = 7;
+
+function isNightNow() {
+  const hour = new Date().getHours();
+  return hour >= NIGHT_START_HOUR || hour < NIGHT_END_HOUR;
+}
+
+function shouldForceSleep(characterId) {
+  const awakeSince = awakeSinceById.get(characterId) || Date.now();
+  const threshold = isNightNow() ? AWAKE_MS_BEFORE_SLEEP_AT_NIGHT : AWAKE_MS_BEFORE_SLEEP;
+  return Date.now() - awakeSince > threshold;
+}
+
+function wakeUp(characterId) {
+  sleepStartedAtById.delete(characterId);
+  awakeSinceById.set(characterId, Date.now());
+}
+
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -198,8 +227,29 @@ async function tick() {
   // characters would burn the whole per-minute token budget in one round.
   for (let i = 0; i < CHARACTERS.length; i++) {
     const character = CHARACTERS[i];
+    if (!awakeSinceById.has(character.id)) awakeSinceById.set(character.id, Date.now());
     // Each character only gets a message that was aimed specifically at it.
     const pendingUserMessage = userMessage.consume(character.id);
+
+    if (sleepStartedAtById.has(character.id)) {
+      if (pendingUserMessage) {
+        // A direct message wakes it up to actually respond this turn, instead of the message
+        // silently waiting until it wakes on its own.
+        wakeUp(character.id);
+      } else if (Date.now() - sleepStartedAtById.get(character.id) > SLEEP_DURATION_MS) {
+        wakeUp(character.id);
+        shimeji.sendCommand(character.id, 'set_animation', { state: 'idle' });
+      } else {
+        // Still asleep - skip calling the AI provider entirely this round (saves quota; a
+        // sleeping character has no business deciding anything anyway).
+        continue;
+      }
+    } else if (shouldForceSleep(character.id)) {
+      shimeji.sendCommand(character.id, 'set_animation', { state: 'sleep' });
+      sleepStartedAtById.set(character.id, Date.now());
+      continue;
+    }
+
     await tickCharacter(character, perception, pendingUserMessage);
     if (i < CHARACTERS.length - 1 && config.characterStaggerMs > 0) await delay(config.characterStaggerMs);
   }

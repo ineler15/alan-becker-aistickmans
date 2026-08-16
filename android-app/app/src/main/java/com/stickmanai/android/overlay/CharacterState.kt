@@ -23,6 +23,14 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
         const val CLIMB_SPEED = 3
         const val CLIMB_FRAME_TICKS = 4
         private const val EDGE_MARGIN = 4
+        // Tiredness: forced to sleep either after being awake too long, or (with a shorter
+        // threshold) if it's nighttime - matches the desktop's existing sleep/tired AIBehavior.java
+        // states, but automatic here instead of only AI-chosen.
+        const val AWAKE_MS_BEFORE_SLEEP = 20 * 60 * 1000L
+        const val AWAKE_MS_BEFORE_SLEEP_AT_NIGHT = 10 * 60 * 1000L
+        const val SLEEP_DURATION_MS = 5 * 60 * 1000L
+        const val NIGHT_START_HOUR = 22
+        const val NIGHT_END_HOUR = 7
     }
 
     var x: Int = screenWidth / 2
@@ -43,6 +51,11 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
     var climbSide = 0 // -1 = climbing the left edge, 1 = climbing the right edge
         private set
     private var climbTargetY = 0
+
+    var sleeping = false
+        private set
+    private var awakeSinceMs = System.currentTimeMillis()
+    private var sleepStartedAt = 0L
 
     private var frame = 0
     private var frameCounter = 0
@@ -84,9 +97,38 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
     fun setEmotion(state: String?) {
         moving = false
         falling = false
+        if (state == "sleep") { startSleeping(); return }
         loopEmotion = state
         frame = 0
         frameCounter = 0
+    }
+
+    private fun isNightNow(): Boolean {
+        val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        return hour >= NIGHT_START_HOUR || hour < NIGHT_END_HOUR
+    }
+
+    private fun shouldForceSleep(): Boolean {
+        val awakeMs = System.currentTimeMillis() - awakeSinceMs
+        val threshold = if (isNightNow()) AWAKE_MS_BEFORE_SLEEP_AT_NIGHT else AWAKE_MS_BEFORE_SLEEP
+        return awakeMs > threshold
+    }
+
+    private fun startSleeping() {
+        sleeping = true
+        sleepStartedAt = System.currentTimeMillis()
+        beingDragged = false
+        moving = false
+        falling = false
+        climbing = false
+        loopEmotion = null
+        frame = 0
+        frameCounter = 0
+    }
+
+    private fun wakeUp() {
+        sleeping = false
+        awakeSinceMs = System.currentTimeMillis()
     }
 
     fun say(text: String) {
@@ -120,7 +162,20 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
         if (System.currentTimeMillis() > sayUntil) speechText = null
 
         if (beingDragged) {
+            if (sleeping) wakeUp()
             return FrameKind.Pinch(frame)
+        }
+        if (sleeping) {
+            if (System.currentTimeMillis() - sleepStartedAt > SLEEP_DURATION_MS) {
+                wakeUp()
+            } else {
+                frameCounter++
+                if (frameCounter >= WALK_FRAME_TICKS) {
+                    frameCounter = 0
+                    frame++
+                }
+                return FrameKind.Sleep(frame)
+            }
         }
         if (falling) {
             if (System.currentTimeMillis() - fallStartedAt > FALL_TIMEOUT_MS || y >= floorY) {
@@ -180,8 +235,13 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
             return when (it) {
                 "happy" -> FrameKind.Bounce(frame)
                 "angry" -> FrameKind.Angry(frame)
+                "tired" -> FrameKind.Tired(frame)
                 else -> FrameKind.Trip(frame)
             }
+        }
+        if (shouldForceSleep()) {
+            startSleeping()
+            return FrameKind.Sleep(0)
         }
         return FrameKind.Stand
     }
@@ -197,5 +257,7 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
         data class Trip(val frame: Int) : FrameKind()
         data class Angry(val frame: Int) : FrameKind()
         data class Climb(val frame: Int) : FrameKind()
+        data class Sleep(val frame: Int) : FrameKind()
+        data class Tired(val frame: Int) : FrameKind()
     }
 }

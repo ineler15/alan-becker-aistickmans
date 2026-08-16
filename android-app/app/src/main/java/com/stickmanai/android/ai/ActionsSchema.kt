@@ -51,10 +51,10 @@ object ActionsSchema {
         put(
             tool(
                 "set_animation",
-                "Expresa una emocion con el cuerpo (no tenes cara).",
+                "Expresa una emocion con el cuerpo (no tenes cara). tired = te tiras cansado, sleep = te acostas a dormir (dejas de recibir turnos hasta que te despierten o pase un rato).",
                 JSONObject().put(
                     "state",
-                    prop("string", "Estado emocional", listOf("idle", "happy", "trip", "sad", "scared", "sit", "angry"))
+                    prop("string", "Estado emocional", listOf("idle", "happy", "trip", "sad", "scared", "sit", "angry", "tired", "sleep"))
                 ),
                 listOf("state")
             )
