@@ -21,6 +21,7 @@ data class Bone(
     val hollow: Boolean,
     val outline: Boolean,
     val outlineColor: Int,
+    val curveRadius: Float,
 )
 
 /**
@@ -60,6 +61,7 @@ object RigLayout {
                         hollow = node.hollow,
                         outline = node.outline,
                         outlineColor = node.outlineColor ?: android.graphics.Color.BLACK,
+                        curveRadius = node.curveRadius,
                     )
                 )
             }

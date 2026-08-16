@@ -22,6 +22,11 @@ data class RigNode(
     val hollow: Boolean,
     val outline: Boolean,
     val outlineColor: Int?,
+    // Some rigs build a "circle" head out of several plain segments instead of a Circle node -
+    // each one bows slightly (Stick Nodes' segment_curve_radius) so the ring reads as round
+    // instead of an octagon when the whole run is drawn as one smoothed stroke (see RigView).
+    // 0 for a straight segment (true for every bone in Red's rig).
+    val curveRadius: Float,
     val children: List<RigNode>,
 )
 
@@ -60,6 +65,7 @@ class RigFigure(val bodyColor: Int, val root: RigNode) {
                 hollow = o.getBoolean("hollow"),
                 outline = outline,
                 outlineColor = if (outline) colorFrom(o.getJSONArray("oc")) else null,
+                curveRadius = o.optDouble("cr", 0.0).toFloat(),
                 children = children,
             )
         }

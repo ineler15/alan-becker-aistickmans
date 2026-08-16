@@ -148,16 +148,28 @@ object PoseLibrary {
         )
     }
 
-    fun forFrameKind(kind: CharacterState.FrameKind): Pose = when (kind) {
-        CharacterState.FrameKind.Stand -> STAND
-        CharacterState.FrameKind.Sit -> SIT
-        is CharacterState.FrameKind.Walk -> walkPose(kind.frame, running = false)
-        is CharacterState.FrameKind.Run -> walkPose(kind.frame, running = true)
-        is CharacterState.FrameKind.Bounce -> bouncePose(kind.frame)
-        is CharacterState.FrameKind.Trip -> tripPose(kind.frame)
-        is CharacterState.FrameKind.Fall -> FALL
-        is CharacterState.FrameKind.Pinch -> pinchPose(kind.frame)
-        is CharacterState.FrameKind.Angry -> angryPose(kind.frame)
-        is CharacterState.FrameKind.Climb -> climbPose(kind.frame)
+    // The bone paths above are hardcoded for Red's specific topology (mapped out by hand - see
+    // sn_proto_wasm_renderer memory) and only hold for a rig sharing that exact bone tree shape.
+    // Blue/Green/Yellow are confirmed (by comparing each rig's node_type tree shape) to share
+    // Red's exact topology - just recolored - so they reuse these poses directly. Every other
+    // rig character (Purple has a genuinely different tree shape; TCO/TDL/Orange/victim build
+    // their head out of a segment ring instead of a Circle node) hasn't been mapped, so applying
+    // Red's paths to them would rotate the wrong bones - they just stand for now.
+    private val SUPPORTED_IDS = setOf("Red", "Blue", "Green", "Yellow")
+
+    fun forFrameKind(kind: CharacterState.FrameKind, characterId: String): Pose {
+        if (characterId !in SUPPORTED_IDS) return STAND
+        return when (kind) {
+            CharacterState.FrameKind.Stand -> STAND
+            CharacterState.FrameKind.Sit -> SIT
+            is CharacterState.FrameKind.Walk -> walkPose(kind.frame, running = false)
+            is CharacterState.FrameKind.Run -> walkPose(kind.frame, running = true)
+            is CharacterState.FrameKind.Bounce -> bouncePose(kind.frame)
+            is CharacterState.FrameKind.Trip -> tripPose(kind.frame)
+            is CharacterState.FrameKind.Fall -> FALL
+            is CharacterState.FrameKind.Pinch -> pinchPose(kind.frame)
+            is CharacterState.FrameKind.Angry -> angryPose(kind.frame)
+            is CharacterState.FrameKind.Climb -> climbPose(kind.frame)
+        }
     }
 }

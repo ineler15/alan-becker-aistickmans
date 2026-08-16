@@ -139,7 +139,7 @@ class CharacterOverlay(
     fun tick() {
         val kind = state.tick()
         if (rigView != null) {
-            rigView.pose = PoseLibrary.forFrameKind(kind)
+            rigView.pose = PoseLibrary.forFrameKind(kind, def.id)
         } else {
             val bitmap = when (kind) {
                 is CharacterState.FrameKind.Stand -> sprites!!.stand

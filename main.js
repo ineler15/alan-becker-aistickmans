@@ -254,6 +254,7 @@ app.whenReady().then(() => {
     pcSettings.save(settings);
     pcSettings.applyToEnv(settings);
     pcSettings.applyEnabledCharacters(settings);
+    pcSettings.applyActiveShimeji(settings);
     if (settingsWindow) settingsWindow.close();
     startShimeji();
     agentLoop.start();
