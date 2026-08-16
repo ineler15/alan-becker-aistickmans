@@ -100,6 +100,7 @@ class CharacterOverlay(
             // Small covered slivers are just status/nav bar chrome, not a keyboard - require a
             // sizeable chunk before treating it as one.
             keyboardInsetPx = if (covered > screenHeight * 0.15) covered else 0
+            android.util.Log.d("StickmanAI", "keyboard check [${def.id}]: rect=$rect screenHeight=$screenHeight covered=$covered insetPx=$keyboardInsetPx")
         }
         render()
     }

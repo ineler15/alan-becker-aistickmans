@@ -19,7 +19,6 @@ import com.stickmanai.android.ai.GeminiClient
 import com.stickmanai.android.ai.PcBridge
 import com.stickmanai.android.ai.PcPeersResult
 import com.stickmanai.android.ai.PeerInfo
-import com.stickmanai.android.chat.ChatActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -47,6 +46,7 @@ class OverlayService : LifecycleService() {
     }
 
     private lateinit var windowManager: android.view.WindowManager
+    private lateinit var chatButton: ChatButtonOverlay
     private val overlays = LinkedHashMap<String, CharacterOverlay>()
     private val pcGhosts = HashMap<String, GhostOverlay>()
     private var pcPeersCache: PcPeersResult = PcPeersResult(0, emptyList())
@@ -80,6 +80,7 @@ class OverlayService : LifecycleService() {
         overlays.clear()
         pcGhosts.values.forEach { it.detach() }
         pcGhosts.clear()
+        if (::chatButton.isInitialized) chatButton.detach()
         super.onDestroy()
     }
 
@@ -87,20 +88,19 @@ class OverlayService : LifecycleService() {
         val metrics = resources.displayMetrics
         for (character in Prefs.enabledCharacters(this)) {
             if (overlays.containsKey(character.id)) continue
+            // Tapping a character used to open ChatActivity, which switched away from whatever
+            // app was in front - that's now the ChatButtonOverlay's job instead (see below), so
+            // there's nothing left for a tap to do here.
             val overlay = CharacterOverlay(
                 this, character, windowManager, metrics.widthPixels, metrics.heightPixels
-            ) { characterId -> openChat(characterId) }
+            ) { }
             overlay.attach()
             overlays[character.id] = overlay
         }
-    }
-
-    private fun openChat(characterId: String) {
-        val intent = Intent(this, ChatActivity::class.java).apply {
-            putExtra(ChatActivity.EXTRA_CHARACTER_ID, characterId)
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        if (!::chatButton.isInitialized) {
+            chatButton = ChatButtonOverlay(this, windowManager)
+            chatButton.attach()
         }
-        startActivity(intent)
     }
 
     private fun startPhysicsLoop() {
@@ -207,7 +207,10 @@ class OverlayService : LifecycleService() {
             // Put the chat message back so it isn't silently lost on a transient network error -
             // it already got consumed above before we knew the call would fail.
             if (userMessage != null) PendingMessages.set(characterId, userMessage)
-            mainHandler.post { overlay.state.randomTarget() }
+            // Used to fall back to a random walk target here, but a burst of failed decide()
+            // calls (e.g. the screenshot crash-loop) made that look like the character going
+            // haywire, constantly re-randomizing its target every tick. Only the AI's own
+            // decisions should move the character now - on error it just stays put.
             overlay.addHistory("error: ${e.message}")
         }
     }
