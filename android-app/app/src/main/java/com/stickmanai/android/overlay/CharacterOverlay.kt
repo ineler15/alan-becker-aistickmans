@@ -152,7 +152,7 @@ class CharacterOverlay(
                 // No sprite art for these - sprite-backed characters just stand instead.
                 is CharacterState.FrameKind.Sit, is CharacterState.FrameKind.Angry,
                 is CharacterState.FrameKind.Climb, is CharacterState.FrameKind.Sleep,
-                is CharacterState.FrameKind.Tired -> sprites!!.stand
+                is CharacterState.FrameKind.Tired, is CharacterState.FrameKind.Custom -> sprites!!.stand
             }
             (characterView as ImageView).setImageBitmap(bitmap)
         }

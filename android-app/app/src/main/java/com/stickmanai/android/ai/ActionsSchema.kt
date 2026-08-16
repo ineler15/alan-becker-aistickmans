@@ -95,6 +95,39 @@ object ActionsSchema {
         )
         put(
             tool(
+                "set_custom_animation",
+                "Armate tu propia mini-animacion (unica, no una de las poses fijas) moviendo tu cuerpo " +
+                    "cuadro por cuadro. Cada cuadro es un angulo en grados para las partes que quieras " +
+                    "mover (torso, leg1, leg1Shin, leg2, leg2Shin, arm1, arm2) - la parte que no " +
+                    "menciones se queda como estaba en el cuadro anterior. Usalo cuando ninguna emocion " +
+                    "fija (set_animation) representa lo que queres expresar. Solo funciona para vos si " +
+                    "tu cuerpo es de los que soportan pose completa (no todos la tienen todavia) - si no " +
+                    "pasa nada, no insistas turno tras turno.",
+                JSONObject().put(
+                    "keyframes",
+                    JSONObject()
+                        .put("type", "array")
+                        .put("description", "Lista ordenada de cuadros (maximo 12), se reproducen en secuencia")
+                        .put(
+                            "items",
+                            JSONObject()
+                                .put("type", "object")
+                                .put(
+                                    "properties",
+                                    JSONObject().apply {
+                                        for (part in listOf("torso", "leg1", "leg1Shin", "leg2", "leg2Shin", "arm1", "arm2")) {
+                                            put(part, prop("number", "Angulo en grados para $part (opcional)"))
+                                        }
+                                        put("holdMs", prop("number", "Cuanto dura este cuadro en milisegundos (100-3000, default 400)"))
+                                    }
+                                )
+                        )
+                ),
+                listOf("keyframes")
+            )
+        )
+        put(
+            tool(
                 "tap",
                 "Toca la pantalla del celular en una posicion (0-100% del ancho y alto), como si " +
                     "fuera un dedo. Requiere que el usuario haya habilitado el permiso de accesibilidad; " +

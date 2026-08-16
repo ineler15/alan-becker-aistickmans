@@ -80,6 +80,37 @@ class MainActivity : AppCompatActivity() {
             requestNotificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
         requestCameraPermission.launch(android.Manifest.permission.CAMERA)
+        // Overlay and accessibility can't be requested via a normal runtime-permission dialog -
+        // each is its own dedicated system Settings screen the user has to flip a switch on, so
+        // there's no way to ask for both (or all four) in a single prompt. Chaining them via
+        // onResume - launching the next missing one as soon as the user returns from the
+        // previous screen - is the closest thing to "ask for everything at once" this allows.
+        requestOverlayOrAccessibilityIfNeeded()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        requestOverlayOrAccessibilityIfNeeded()
+    }
+
+    // Each screen only auto-launches once per MainActivity lifetime (i.e. once per app open) -
+    // without this, backing out of one without granting it would just relaunch the same screen
+    // every time onResume fires, trapping the user in a loop they can't dismiss.
+    private var autoPromptedOverlay = false
+    private var autoPromptedAccessibility = false
+
+    private fun requestOverlayOrAccessibilityIfNeeded() {
+        if (!Settings.canDrawOverlays(this)) {
+            if (!autoPromptedOverlay) {
+                autoPromptedOverlay = true
+                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+            }
+        } else if (!com.stickmanai.android.input.TapAccessibilityService.isEnabled) {
+            if (!autoPromptedAccessibility) {
+                autoPromptedAccessibility = true
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+        }
     }
 
     override fun onPause() {

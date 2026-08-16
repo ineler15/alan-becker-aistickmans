@@ -240,6 +240,18 @@ class OverlayService : LifecycleService() {
                     com.stickmanai.android.chat.ChatNotifications.showSay(this, overlay.def.id, overlay.def.displayName, text)
                 }
             }
+            "set_custom_animation" -> {
+                val keyframesJson = args.optJSONArray("keyframes")
+                if (keyframesJson != null) {
+                    val bodyParts = listOf("torso", "leg1", "leg1Shin", "leg2", "leg2Shin", "arm1", "arm2")
+                    val keyframes = (0 until keyframesJson.length()).map { i ->
+                        val kf = keyframesJson.getJSONObject(i)
+                        val angles = bodyParts.filter { kf.has(it) }.associateWith { kf.optDouble(it).toFloat() }
+                        CharacterState.Keyframe(angles, kf.optLong("holdMs", CharacterState.DEFAULT_KEYFRAME_HOLD_MS))
+                    }
+                    overlay.state.startCustomAnimation(keyframes)
+                }
+            }
             "define_personality" -> Prefs.setPersonality(this, overlay.def.id, args.optString("description", ""))
             "remember" -> Prefs.addMemory(this, overlay.def.id, args.optString("note", ""))
             "open_app" -> openUrl(args.optString("url", ""))

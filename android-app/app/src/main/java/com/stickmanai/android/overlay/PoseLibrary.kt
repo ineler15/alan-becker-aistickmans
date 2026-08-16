@@ -173,6 +173,23 @@ object PoseLibrary {
         )
     }
 
+    // Friendly names an AI-authored keyframe can use (see CharacterState.Keyframe/startCustomAnimation)
+    // mapped to the actual bone paths - keeps the raw path lists (child-index lists, meaningless
+    // to a model) out of the AI-facing schema entirely.
+    private val NAME_TO_PATH = mapOf(
+        "torso" to BonePaths.TORSO_LOWER,
+        "leg1" to BonePaths.LEG1,
+        "leg1Shin" to BonePaths.LEG1_SHIN,
+        "leg2" to BonePaths.LEG2,
+        "leg2Shin" to BonePaths.LEG2_SHIN,
+        "arm1" to BonePaths.ARM1,
+        "arm2" to BonePaths.ARM2,
+    )
+
+    /** Builds a Pose from an AI-authored keyframe's friendly-named angles; unknown names are ignored. */
+    fun customPose(angles: Map<String, Float>): Pose =
+        angles.mapNotNull { (name, angle) -> NAME_TO_PATH[name]?.let { it to angle } }.toMap()
+
     // The bone paths above are hardcoded for Red's specific topology (mapped out by hand - see
     // sn_proto_wasm_renderer memory) and only hold for a rig sharing that exact bone tree shape.
     // Blue/Green/Yellow are confirmed (by comparing each rig's node_type tree shape) to share
@@ -197,6 +214,7 @@ object PoseLibrary {
             is CharacterState.FrameKind.Climb -> climbPose(kind.frame)
             is CharacterState.FrameKind.Sleep -> sleepPose(kind.frame)
             is CharacterState.FrameKind.Tired -> TIRED
+            is CharacterState.FrameKind.Custom -> customPose(kind.angles)
         }
     }
 }

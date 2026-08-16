@@ -31,7 +31,20 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
         const val SLEEP_DURATION_MS = 5 * 60 * 1000L
         const val NIGHT_START_HOUR = 22
         const val NIGHT_END_HOUR = 7
+        const val MAX_CUSTOM_KEYFRAMES = 12
+        const val MIN_KEYFRAME_HOLD_MS = 100L
+        const val MAX_KEYFRAME_HOLD_MS = 3000L
+        const val DEFAULT_KEYFRAME_HOLD_MS = 400L
     }
+
+    /**
+     * One frame of an AI-authored custom animation - angles keyed by the same friendly bone
+     * names PoseLibrary.customPose() understands (torso/leg1/leg1Shin/leg2/leg2Shin/arm1/arm2).
+     * A bone omitted from a keyframe keeps whatever value the previous keyframe left it at
+     * (or the rig's own rest angle, if no earlier keyframe set it either) rather than snapping
+     * back to rest every frame - see CharacterState.tick()'s customAnimation handling.
+     */
+    data class Keyframe(val angles: Map<String, Float>, val holdMs: Long)
 
     var x: Int = screenWidth / 2
     var y: Int = floorY
@@ -57,6 +70,11 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
     private var awakeSinceMs = System.currentTimeMillis()
     private var sleepStartedAt = 0L
 
+    private var customAnimation: List<Keyframe>? = null
+    private var customIndex = 0
+    private var customKeyframeStartedAt = 0L
+    private var customAccumulatedAngles = mutableMapOf<String, Float>()
+
     private var frame = 0
     private var frameCounter = 0
     var loopEmotion: String? = null // "happy" (bounce), "sit", or "scared"/"trip" (trip) - null = normal walk/stand
@@ -70,6 +88,7 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
         beingDragged = false
         falling = false
         loopEmotion = null
+        customAnimation = null
         moving = true
         running = run
         moveTargetX = targetX.coerceIn(0, screenWidth)
@@ -80,6 +99,7 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
         moving = false
         climbing = false
         loopEmotion = null
+        customAnimation = null
         falling = true
         fallStartedAt = System.currentTimeMillis()
     }
@@ -94,9 +114,32 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
         climbTargetY = Random.nextInt((screenHeight * 0.1).toInt(), (screenHeight * 0.5).toInt())
     }
 
+    /**
+     * Starts an AI-authored custom animation - a sequence of keyframes played back in order,
+     * instead of only the fixed named poses (sit/angry/etc). Clamped defensively since these
+     * come straight from the model: at most MAX_CUSTOM_KEYFRAMES frames, each held for
+     * MIN..MAX_KEYFRAME_HOLD_MS.
+     */
+    fun startCustomAnimation(keyframes: List<Keyframe>) {
+        if (keyframes.isEmpty()) return
+        beingDragged = false
+        falling = false
+        climbing = false
+        moving = false
+        loopEmotion = null
+        if (sleeping) wakeUp()
+        customAnimation = keyframes.take(MAX_CUSTOM_KEYFRAMES).map {
+            it.copy(holdMs = it.holdMs.coerceIn(MIN_KEYFRAME_HOLD_MS, MAX_KEYFRAME_HOLD_MS))
+        }
+        customIndex = 0
+        customKeyframeStartedAt = System.currentTimeMillis()
+        customAccumulatedAngles = mutableMapOf()
+    }
+
     fun setEmotion(state: String?) {
         moving = false
         falling = false
+        customAnimation = null
         if (state == "sleep") { startSleeping(); return }
         loopEmotion = state
         frame = 0
@@ -163,7 +206,21 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
 
         if (beingDragged) {
             if (sleeping) wakeUp()
+            customAnimation = null
             return FrameKind.Pinch(frame)
+        }
+        customAnimation?.let { keyframes ->
+            val elapsed = System.currentTimeMillis() - customKeyframeStartedAt
+            if (elapsed > keyframes[customIndex].holdMs) {
+                customAccumulatedAngles.putAll(keyframes[customIndex].angles)
+                customIndex++
+                customKeyframeStartedAt = System.currentTimeMillis()
+            }
+            if (customIndex >= keyframes.size) {
+                customAnimation = null
+            } else {
+                return FrameKind.Custom(customAccumulatedAngles + keyframes[customIndex].angles)
+            }
         }
         if (sleeping) {
             if (System.currentTimeMillis() - sleepStartedAt > SLEEP_DURATION_MS) {
@@ -259,5 +316,6 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
         data class Climb(val frame: Int) : FrameKind()
         data class Sleep(val frame: Int) : FrameKind()
         data class Tired(val frame: Int) : FrameKind()
+        data class Custom(val angles: Map<String, Float>) : FrameKind()
     }
 }
