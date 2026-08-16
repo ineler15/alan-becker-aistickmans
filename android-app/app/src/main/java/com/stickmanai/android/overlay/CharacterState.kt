@@ -238,7 +238,7 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
             if (System.currentTimeMillis() - fallStartedAt > FALL_TIMEOUT_MS || y >= floorY) {
                 falling = false
                 y = floorY
-                return FrameKind.Stand
+                return FrameKind.Stand(0)
             }
             y = (y + FALL_SPEED).coerceAtMost(floorY)
             frameCounter++
@@ -272,7 +272,7 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
                     startClimbing(if (x <= EDGE_MARGIN) -1 else 1)
                     return FrameKind.Climb(0)
                 }
-                return FrameKind.Stand
+                return FrameKind.Stand(0)
             }
             x += if (moveTargetX > x) speed else -speed
             frameCounter++
@@ -300,11 +300,19 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
             startSleeping()
             return FrameKind.Sleep(0)
         }
-        return FrameKind.Stand
+        // Idle sway instead of a perfectly frozen frame - see PoseLibrary.standPose(). Reuses the
+        // same frame/frameCounter fields every other animated state does; a stale phase carried
+        // over from whatever state ran before idle doesn't matter for a continuous sway.
+        frameCounter++
+        if (frameCounter >= WALK_FRAME_TICKS) {
+            frameCounter = 0
+            frame++
+        }
+        return FrameKind.Stand(frame)
     }
 
     sealed class FrameKind {
-        object Stand : FrameKind()
+        data class Stand(val frame: Int) : FrameKind()
         object Sit : FrameKind()
         data class Walk(val frame: Int) : FrameKind()
         data class Run(val frame: Int) : FrameKind()

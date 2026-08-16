@@ -51,6 +51,12 @@ class OverlayService : LifecycleService() {
     private val pcGhosts = HashMap<String, GhostOverlay>()
     private var pcPeersCache: PcPeersResult = PcPeersResult(0, emptyList())
     private val turnsSinceSay = HashMap<String, Int>()
+    // Anti-repetition: mirrors PC's agentLoop.js lastToolById/repeatStreakById - if the AI picks
+    // the same tool 3 times in a row (e.g. stuck spamming set_animation or say), force a move
+    // instead so it doesn't look frozen/repetitive. walk_to/move_random are exempt since actually
+    // moving repeatedly is fine.
+    private val lastToolById = HashMap<String, String>()
+    private val repeatStreakById = HashMap<String, Int>()
     private val serviceScope = CoroutineScope(Dispatchers.Default + Job())
     private val mainHandler = Handler(Looper.getMainLooper())
     private var physicsRunning = false
@@ -204,9 +210,10 @@ class OverlayService : LifecycleService() {
                 cameraBase64 = cameraBase64,
                 screenBase64 = screenBase64,
             )
-            turnsSinceSay[characterId] = if (decision.tool == "say") 0 else silentStreak + 1
-            mainHandler.post { applyDecision(overlay, decision.tool, decision.args) }
-            overlay.addHistory("${decision.tool}(${decision.args})")
+            val (tool, args) = dedupeRepeatedAction(characterId, decision.tool, decision.args)
+            turnsSinceSay[characterId] = if (tool == "say") 0 else silentStreak + 1
+            mainHandler.post { applyDecision(overlay, tool, args) }
+            overlay.addHistory("${tool}(${args})")
         } catch (e: Exception) {
             android.util.Log.e("StickmanAI", "decide() failed for $characterId", e)
             // Put the chat message back so it isn't silently lost on a transient network error -
@@ -218,6 +225,23 @@ class OverlayService : LifecycleService() {
             // decisions should move the character now - on error it just stays put.
             overlay.addHistory("error: ${e.message}")
         }
+    }
+
+    /**
+     * If the AI has picked the same tool 3 times in a row for this character, swaps it for
+     * move_random instead - same fix as the desktop's agentLoop.js repeat guard, so a character
+     * doesn't get stuck spamming e.g. set_animation("sit") or say() forever.
+     */
+    private fun dedupeRepeatedAction(characterId: String, tool: String, args: JSONObject): Pair<String, JSONObject> {
+        val streak = if (tool == lastToolById[characterId]) (repeatStreakById[characterId] ?: 0) + 1 else 0
+        lastToolById[characterId] = tool
+        repeatStreakById[characterId] = streak
+        if (streak >= 3 && tool != "move_random" && tool != "walk_to") {
+            repeatStreakById[characterId] = 0
+            lastToolById[characterId] = "move_random"
+            return "move_random" to JSONObject()
+        }
+        return tool to args
     }
 
     private fun applyDecision(overlay: CharacterOverlay, tool: String, args: JSONObject) {

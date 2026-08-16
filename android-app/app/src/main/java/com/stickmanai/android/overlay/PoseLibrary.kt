@@ -103,6 +103,20 @@ private fun blendToward(from: Float, to: Float, t: Float): Float {
 object PoseLibrary {
     val STAND: Pose = emptyMap()
 
+    /**
+     * Idle sway instead of a perfectly frozen stand - just a slow "breathing" tilt on the torso
+     * and a slight opposite arm sway, subtle enough to still read as standing still rather than
+     * doing something, but enough that the character doesn't look frozen/dead between decisions.
+     */
+    private fun standPose(p: RigProfile, frame: Int): Pose {
+        val sway = 3f * sin(TWO_PI * frame / 30f)
+        return mapOf(
+            p.paths.torsoLower to p.rest.torsoLower + sway,
+            p.paths.arm1 to p.rest.arm1 + sway * 0.6f,
+            p.paths.arm2 to p.rest.arm2 - sway * 0.6f,
+        )
+    }
+
     // Deltas derived from Red's original hand-tuned SIT (leg1 190 vs rest 246.8, etc.) - was
     // hardcoded as absolute angles disconnected from `rest` entirely (the compiler even flagged
     // the unused parameter), which only happened to look right for Red/Blue/Green/Yellow because
@@ -280,7 +294,7 @@ object PoseLibrary {
     fun forFrameKind(kind: CharacterState.FrameKind, characterId: String): Pose {
         val profile = PROFILE_BY_ID[characterId] ?: return STAND
         return when (kind) {
-            CharacterState.FrameKind.Stand -> STAND
+            is CharacterState.FrameKind.Stand -> standPose(profile, kind.frame)
             CharacterState.FrameKind.Sit -> sitPose(profile)
             is CharacterState.FrameKind.Walk -> walkPose(profile, kind.frame, running = false)
             is CharacterState.FrameKind.Run -> walkPose(profile, kind.frame, running = true)
