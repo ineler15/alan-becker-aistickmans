@@ -44,7 +44,7 @@ async function execute(name, args, characterId) {
     case 'open_paint':
       return { ok: true, result: await paint.openPaint() };
     case 'write_in_paint':
-      return { ok: true, result: await paint.writeInPaint(args.text) };
+      return { ok: true, result: await paint.writeInPaint(args.text, args.x, args.y) };
     case 'draw_in_paint': {
       // The schema declares every param as a string, so a tool-calling model may hand
       // back "points" either as a real array or as a JSON-encoded string - accept both.
@@ -52,9 +52,12 @@ async function execute(name, args, characterId) {
       // normalize both shapes here instead of drawing silently-broken NaN coordinates.
       const raw = typeof args.points === 'string' ? JSON.parse(args.points) : args.points;
       const points = (raw || []).map((p) => (Array.isArray(p) ? { x: p[0], y: p[1] } : p));
-      await paint.drawInPaint(points);
+      await paint.drawInPaint(points, { close: !!args.close, fill: !!args.fill });
       return { ok: true, result: 'dibujo trazado' };
     }
+    case 'draw_shape':
+      await paint.drawShape(args.shape, args.x, args.y, args.width, args.height, !!args.fill);
+      return { ok: true, result: `${args.shape} dibujado` };
     case 'read_paint':
       return { ok: true, result: await paint.readPaint() };
     case 'set_paint_color':

@@ -16,7 +16,9 @@ function toPixels(p) {
   };
 }
 
-ipcRenderer.on('stickpaint:draw', (_event, points) => {
+ipcRenderer.on('stickpaint:draw', (_event, payload) => {
+  // Backwards compatible with the old shape (a bare points array, no close/fill).
+  const { points, close, fill } = Array.isArray(payload) ? { points: payload } : payload;
   if (!Array.isArray(points) || points.length < 2) return;
   ctx.beginPath();
   const first = toPixels(points[0]);
@@ -25,6 +27,26 @@ ipcRenderer.on('stickpaint:draw', (_event, points) => {
     const p = toPixels(points[i]);
     ctx.lineTo(p.x, p.y);
   }
+  if (close || fill) ctx.closePath();
+  if (fill) ctx.fill();
+  ctx.stroke();
+});
+
+ipcRenderer.on('stickpaint:shape', (_event, { shape, x, y, width, height, fill }) => {
+  const center = toPixels({ x, y });
+  // width/height are given as percent-of-canvas too, same convention as point coordinates -
+  // scaled against canvas width/height directly rather than toPixels (which clamps to a point).
+  const w = (Math.max(0, width) / 100) * canvas.width;
+  const h = (Math.max(0, height) / 100) * canvas.height;
+  ctx.beginPath();
+  if (shape === 'circle') {
+    ctx.arc(center.x, center.y, Math.max(w, h) / 2, 0, Math.PI * 2);
+  } else if (shape === 'ellipse') {
+    ctx.ellipse(center.x, center.y, w / 2, h / 2, 0, 0, Math.PI * 2);
+  } else {
+    ctx.rect(center.x - w / 2, center.y - h / 2, w, h);
+  }
+  if (fill) ctx.fill();
   ctx.stroke();
 });
 

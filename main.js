@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, globalShortcut, shell, session } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, globalShortcut, shell, session, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn, exec } = require('child_process');
@@ -160,6 +160,44 @@ function createSettingsWindow() {
   });
 }
 
+// Proof-of-concept only (see renderer/rig.js) - draws Red from her actual Stick Nodes rig data in
+// a transparent always-on-top window, running ALONGSIDE the existing Shimeji-rendered characters,
+// not replacing anything. Toggled from the tray, off by default. Not wired to position/AI/poses
+// yet - this only validates the renderer itself works inside a real Electron window.
+let rigTestWindow = null;
+
+function toggleRigTestWindow() {
+  if (rigTestWindow) {
+    rigTestWindow.close();
+    return;
+  }
+  // BrowserWindow's width/height are in DIP, which Windows display scaling (e.g. 150%) then
+  // blows up to more physical pixels than intended - dividing by scaleFactor keeps this looking
+  // the size it's supposed to regardless of the user's scaling setting.
+  const scaleFactor = screen.getPrimaryDisplay().scaleFactor || 1;
+  const size = Math.round(220 / scaleFactor);
+  rigTestWindow = new BrowserWindow({
+    width: size,
+    height: size,
+    x: 40,
+    y: 40,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  rigTestWindow.setIgnoreMouseEvents(true);
+  rigTestWindow.loadFile(path.join(__dirname, 'renderer', 'rig.html'));
+  rigTestWindow.on('closed', () => {
+    rigTestWindow = null;
+  });
+}
+
 function buildTrayMenu() {
   return Menu.buildFromTemplate([
     {
@@ -173,6 +211,13 @@ function buildTrayMenu() {
       label: `Hablar con ${c.displayName}`,
       click: () => openChatWindow(c.id),
     })),
+    {
+      label: rigTestWindow ? 'Cerrar prueba de rig (Red)' : 'Probar renderer de rig (Red)',
+      click: () => {
+        toggleRigTestWindow()
+        tray.setContextMenu(buildTrayMenu())
+      },
+    },
     {
       label: 'Abrir carpeta workspace',
       click: () => shell.openPath(config.workspaceDir),
@@ -242,6 +287,16 @@ app.whenReady().then(() => {
   });
   if (!chatRegistered) {
     console.warn('No se pudo registrar el hotkey global para el chat: Control+Shift+H');
+  }
+
+  // Same rig-test toggle as the tray menu item, just reachable without clicking the tray icon -
+  // added so it could be triggered by simulated input (SendKeys) during development.
+  const rigTestRegistered = globalShortcut.register('Control+Shift+R', () => {
+    toggleRigTestWindow();
+    if (tray) tray.setContextMenu(buildTrayMenu());
+  });
+  if (!rigTestRegistered) {
+    console.warn('No se pudo registrar el hotkey global de prueba de rig: Control+Shift+R');
   }
 
   ipcMain.handle('stickman:get-settings', () => ({

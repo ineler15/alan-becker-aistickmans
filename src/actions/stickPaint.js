@@ -42,14 +42,25 @@ async function writeInPaint(text, x, y) {
   drawLog.push(`escribio: "${text}"`);
 }
 
-async function drawInPaint(points) {
+async function drawInPaint(points, options = {}) {
   if (!Array.isArray(points) || points.length < 2) {
     throw new Error('draw_in_paint necesita al menos 2 puntos');
   }
   const w = getWindow();
   if (!w.isVisible()) w.show();
-  w.webContents.send('stickpaint:draw', points);
-  drawLog.push(`dibujo un trazo de ${points.length} puntos`);
+  w.webContents.send('stickpaint:draw', { points, close: !!options.close, fill: !!options.fill });
+  drawLog.push(`dibujo un trazo de ${points.length} puntos${options.fill ? ' (relleno)' : ''}`);
+}
+
+async function drawShape(shape, x, y, width, height, fill) {
+  const validShapes = ['circle', 'rect', 'ellipse'];
+  if (!validShapes.includes(shape)) {
+    throw new Error(`draw_shape: forma desconocida "${shape}" (usa circle/rect/ellipse)`);
+  }
+  const w = getWindow();
+  if (!w.isVisible()) w.show();
+  w.webContents.send('stickpaint:shape', { shape, x, y, width, height, fill: !!fill });
+  drawLog.push(`dibujo un ${shape}${fill ? ' relleno' : ''}`);
 }
 
 async function setColor(color) {
@@ -68,4 +79,4 @@ async function readPaint() {
   return drawLog.length ? drawLog.join('\n') : '(el lienzo esta vacio)';
 }
 
-module.exports = { openPaint, writeInPaint, drawInPaint, readPaint, setColor, clear };
+module.exports = { openPaint, writeInPaint, drawInPaint, drawShape, readPaint, setColor, clear };

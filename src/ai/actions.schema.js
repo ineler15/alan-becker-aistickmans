@@ -59,8 +59,31 @@ const ACTIONS = [
     desc:
       'Dibuja una linea/figura simple en el lienzo de StickPaint. Recibe una lista de puntos ' +
       '(al menos 2) en porcentaje del lienzo (x e y de 0 a 100) y los conecta en orden, como si fuera ' +
-      'un trazo continuo de lapiz. Util para dibujar caras, formas simples, flechas, etc.',
-    params: { points: 'array of {x:number, y:number} (0-100, al menos 2 puntos)' },
+      'un trazo continuo de lapiz. Util para dibujar caras, formas simples, flechas, etc. Con ' +
+      'close=true cierra la figura (vuelve del ultimo punto al primero) y con fill=true la rellena ' +
+      'del color actual (set_paint_color) - asi podes dibujar cualquier forma cerrada rellena, no ' +
+      'solo lineas sueltas.',
+    params: {
+      points: 'array of {x:number, y:number} (0-100, al menos 2 puntos)',
+      close: 'boolean (opcional) - cierra la figura volviendo al primer punto',
+      fill: 'boolean (opcional) - rellena la figura (implica close)',
+    },
+    risky: false,
+  },
+  {
+    name: 'draw_shape',
+    desc:
+      'Dibuja una forma exacta (circulo, rectangulo o elipse) sin tener que aproximarla con puntos ' +
+      'en draw_in_paint - mas facil para formas regulares. x,y es el centro; width/height el tamano, ' +
+      'todo en porcentaje del lienzo (0-100). Usa el color actual (set_paint_color).',
+    params: {
+      shape: 'string (circle|rect|ellipse)',
+      x: 'number (0-100, centro horizontal)',
+      y: 'number (0-100, centro vertical)',
+      width: 'number (0-100)',
+      height: 'number (0-100)',
+      fill: 'boolean (opcional) - rellena en vez de solo el contorno',
+    },
     risky: false,
   },
   {
