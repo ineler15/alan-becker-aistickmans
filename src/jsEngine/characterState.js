@@ -24,6 +24,9 @@ const MAX_CUSTOM_KEYFRAMES = 12;
 const MIN_KEYFRAME_HOLD_MS = 100;
 const MAX_KEYFRAME_HOLD_MS = 3000;
 const DEFAULT_KEYFRAME_HOLD_MS = 400;
+// Autonomous wander: if nothing (AI decision or drag) has moved this character in a while, walk
+// somewhere on its own instead of just idling in place.
+const IDLE_WALK_TIMEOUT_MS = 6000;
 
 class CharacterState {
   constructor(screenWidth, screenHeight, floorY) {
@@ -53,12 +56,14 @@ class CharacterState {
 
     this.frame = 0;
     this.frameCounter = 0;
+    this.lastActiveAt = Date.now();
     this.loopEmotion = null;
     this.sayUntil = 0;
     this.speechText = null;
   }
 
   startMoving(targetX, run) {
+    this.lastActiveAt = Date.now();
     this.beingDragged = false;
     this.falling = false;
     this.loopEmotion = null;
@@ -74,6 +79,7 @@ class CharacterState {
   }
 
   startFalling() {
+    this.lastActiveAt = Date.now();
     this.moving = false;
     this.loopEmotion = null;
     this.customAnimation = null;
@@ -83,6 +89,7 @@ class CharacterState {
 
   startCustomAnimation(keyframes) {
     if (!Array.isArray(keyframes) || keyframes.length === 0) return;
+    this.lastActiveAt = Date.now();
     this.beingDragged = false;
     this.falling = false;
     this.moving = false;
@@ -98,6 +105,7 @@ class CharacterState {
   }
 
   setEmotion(state) {
+    this.lastActiveAt = Date.now();
     this.moving = false;
     this.falling = false;
     this.customAnimation = null;
@@ -119,6 +127,7 @@ class CharacterState {
   }
 
   dragTo(px, py) {
+    this.lastActiveAt = Date.now();
     this.x = px;
     this.y = py;
     this.frameCounter++;
@@ -247,6 +256,16 @@ class CharacterState {
     if (this._shouldForceSleep()) {
       this._startSleeping();
       return { kind: 'sleep', frame: 0 };
+    }
+
+    // Autonomous wander - if nothing (AI decision or drag) has moved this character in a while,
+    // walk somewhere on its own instead of standing there indefinitely (covers a stuck/erroring
+    // AI provider too, not just a missing key - see IDLE_WALK_TIMEOUT_MS).
+    if (Date.now() - this.lastActiveAt > IDLE_WALK_TIMEOUT_MS) {
+      this.randomTarget(false);
+      this.frame = 0;
+      this.frameCounter = 0;
+      return { kind: 'walk', frame: 0 };
     }
 
     // Idle sway instead of a perfectly frozen frame - see poseLibrary.js's standPose(). Reuses

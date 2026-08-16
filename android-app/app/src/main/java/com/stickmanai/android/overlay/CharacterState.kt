@@ -35,6 +35,11 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
         const val MIN_KEYFRAME_HOLD_MS = 100L
         const val MAX_KEYFRAME_HOLD_MS = 3000L
         const val DEFAULT_KEYFRAME_HOLD_MS = 400L
+        // Autonomous wander: if nothing (AI decision or user drag) has moved this character in a
+        // while, walk somewhere on its own instead of just idling in place - a character with no
+        // configured API key (see Prefs.apiKeyFor) never gets an AI decision at all, so without
+        // this it would otherwise stand there forever.
+        const val IDLE_WALK_TIMEOUT_MS = 6000L
     }
 
     /**
@@ -77,6 +82,7 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
 
     private var frame = 0
     private var frameCounter = 0
+    private var lastActiveAt = System.currentTimeMillis()
     var loopEmotion: String? = null // "happy" (bounce), "sit", or "scared"/"trip" (trip) - null = normal walk/stand
         private set
     var sayUntil = 0L
@@ -85,6 +91,7 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
         private set
 
     fun startMoving(targetX: Int, run: Boolean) {
+        lastActiveAt = System.currentTimeMillis()
         beingDragged = false
         falling = false
         loopEmotion = null
@@ -96,6 +103,7 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
     }
 
     fun startFalling() {
+        lastActiveAt = System.currentTimeMillis()
         moving = false
         climbing = false
         loopEmotion = null
@@ -105,6 +113,7 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
     }
 
     private fun startClimbing(side: Int) {
+        lastActiveAt = System.currentTimeMillis()
         climbing = true
         climbSide = side
         moving = false
@@ -122,6 +131,7 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
      */
     fun startCustomAnimation(keyframes: List<Keyframe>) {
         if (keyframes.isEmpty()) return
+        lastActiveAt = System.currentTimeMillis()
         beingDragged = false
         falling = false
         climbing = false
@@ -137,6 +147,7 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
     }
 
     fun setEmotion(state: String?) {
+        lastActiveAt = System.currentTimeMillis()
         moving = false
         falling = false
         customAnimation = null
@@ -186,6 +197,7 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
 
     /** Called every TICK_MS while beingDragged, following the finger. */
     fun dragTo(px: Int, py: Int) {
+        lastActiveAt = System.currentTimeMillis()
         x = px
         y = py
         frameCounter++
@@ -299,6 +311,15 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
         if (shouldForceSleep()) {
             startSleeping()
             return FrameKind.Sleep(0)
+        }
+        // Autonomous wander - if nothing (AI decision or drag) has moved this character in a
+        // while, walk somewhere on its own instead of standing there indefinitely (a character
+        // with no configured API key never gets an AI decision at all - see IDLE_WALK_TIMEOUT_MS).
+        if (System.currentTimeMillis() - lastActiveAt > IDLE_WALK_TIMEOUT_MS) {
+            randomTarget()
+            frame = 0
+            frameCounter = 0
+            return FrameKind.Walk(0)
         }
         // Idle sway instead of a perfectly frozen frame - see PoseLibrary.standPose(). Reuses the
         // same frame/frameCounter fields every other animated state does; a stale phase carried

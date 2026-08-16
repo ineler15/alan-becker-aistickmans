@@ -109,7 +109,7 @@ object PoseLibrary {
      * doing something, but enough that the character doesn't look frozen/dead between decisions.
      */
     private fun standPose(p: RigProfile, frame: Int): Pose {
-        val sway = 3f * sin(TWO_PI * frame / 30f)
+        val sway = 1f * sin(TWO_PI * frame / 90f)
         return mapOf(
             p.paths.torsoLower to p.rest.torsoLower + sway,
             p.paths.arm1 to p.rest.arm1 + sway * 0.6f,

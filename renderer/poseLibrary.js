@@ -78,7 +78,7 @@
   // slight opposite arm sway, subtle enough to still read as standing still but enough that the
   // character doesn't look frozen/dead between decisions.
   function standPose(paths, rest, frame) {
-    const sway = 3 * Math.sin((TWO_PI * frame) / 30);
+    const sway = 1 * Math.sin((TWO_PI * frame) / 90);
     return byPath(paths, {
       torso: rest.torsoLower + sway,
       arm1: rest.arm1 + sway * 0.6,
