@@ -56,6 +56,20 @@ private val TCO_TOPOLOGY_REST = RestAngles(
 private const val TWO_PI = (2.0 * Math.PI).toFloat()
 
 /**
+ * Blends `from` a fraction `t` of the way toward `to`, going by the shortest way around the
+ * circle instead of naive linear subtraction - e.g. blending from -66.8 toward 270 the "long way"
+ * (336.8 degrees) lands somewhere nowhere near either angle, when the actual shortest path is
+ * only -23.2 degrees. Matters once poses stopped being tuned against a single hardcoded rest
+ * angle (Red's) and started taking wildly different per-character rest angles (TCO/Orange).
+ */
+private fun blendToward(from: Float, to: Float, t: Float): Float {
+    var diff = (to - from) % 360f
+    if (diff > 180f) diff -= 360f
+    if (diff < -180f) diff += 360f
+    return from + diff * t
+}
+
+/**
  * Named/procedural poses as angle overrides on top of a rig's own authored rest pose. Angles are
  * absolute local_angle replacements (same convention as RigNode.localAngleDeg), not deltas - each
  * pose function takes the character's RestAngles and swings around those, so the same pose logic
@@ -140,8 +154,8 @@ object PoseLibrary {
      */
     private fun pinchPose(rest: RestAngles, frame: Int): Pose {
         val sway = 6f * sin(TWO_PI * frame / 14f)
-        val leg1Tuck = rest.leg1 + (270f - rest.leg1) * 0.5f
-        val leg2Tuck = rest.leg2 + (270f - rest.leg2) * 0.5f
+        val leg1Tuck = blendToward(rest.leg1, 270f, 0.5f)
+        val leg2Tuck = blendToward(rest.leg2, 270f, 0.5f)
         return mapOf(
             BonePaths.TORSO_LOWER to rest.torsoLower + sway,
             BonePaths.LEG1 to leg1Tuck + sway,
