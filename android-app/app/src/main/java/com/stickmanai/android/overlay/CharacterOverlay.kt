@@ -93,16 +93,22 @@ class CharacterOverlay(
         characterView.setOnTouchListener { _, event -> handleTouch(event) }
         windowManager.addView(characterView, imageParams)
         windowManager.addView(speechView, speechParams)
-        characterView.viewTreeObserver.addOnGlobalLayoutListener {
-            val rect = Rect()
-            characterView.getWindowVisibleDisplayFrame(rect)
-            val covered = screenHeight - rect.bottom
-            // Small covered slivers are just status/nav bar chrome, not a keyboard - require a
-            // sizeable chunk before treating it as one.
-            keyboardInsetPx = if (covered > screenHeight * 0.15) covered else 0
-            android.util.Log.d("StickmanAI", "keyboard check [${def.id}]: rect=$rect screenHeight=$screenHeight covered=$covered insetPx=$keyboardInsetPx")
-        }
         render()
+    }
+
+    // Recomputed every tick() instead of only from a one-off OnGlobalLayoutListener - that
+    // listener reliably fires when the keyboard opens (its layout pass genuinely changes this
+    // small overlay window's visible frame), but often does NOT fire again once the keyboard
+    // closes, since nothing forces another layout pass for this particular window at that point.
+    // That left keyboardInsetPx stuck > 0 forever, hiding the character until the app restarted -
+    // recomputing on every tick self-corrects regardless of whether a layout event ever comes.
+    private fun updateKeyboardInset() {
+        val rect = Rect()
+        characterView.getWindowVisibleDisplayFrame(rect)
+        val covered = screenHeight - rect.bottom
+        // Small covered slivers are just status/nav bar chrome, not a keyboard - require a
+        // sizeable chunk before treating it as one.
+        keyboardInsetPx = if (covered > screenHeight * 0.15) covered else 0
     }
 
     fun detach() {
@@ -178,6 +184,7 @@ class CharacterOverlay(
         if (isEmpty()) sprites!!.stand else this[i % size]
 
     private fun render() {
+        updateKeyboardInset()
         // Just lifting the character above the keyboard still parks it right at the keyboard's
         // top edge - exactly where a text field being typed into usually sits, so it kept
         // covering the very thing the user was writing in. Hiding it outright while the
