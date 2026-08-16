@@ -48,30 +48,48 @@ class TapAccessibilityService : AccessibilityService() {
          * the device is below Android 11 (takeScreenshot needs API 30).
          */
         suspend fun captureScreenshotBase64(): String? {
-            val service = instance ?: return null
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
+            val service = instance ?: run {
+                android.util.Log.w("StickmanAI", "captureScreenshotBase64: servicio no conectado")
+                return null
+            }
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                android.util.Log.w("StickmanAI", "captureScreenshotBase64: SDK ${Build.VERSION.SDK_INT} < 30")
+                return null
+            }
             return suspendCancellableCoroutine { cont ->
-                service.takeScreenshot(
-                    Display.DEFAULT_DISPLAY,
-                    ContextCompat.getMainExecutor(service),
-                    object : TakeScreenshotCallback {
-                        override fun onSuccess(result: ScreenshotResult) {
-                            val encoded = try {
-                                encodeJpeg(result)
-                            } catch (e: Exception) {
-                                android.util.Log.w("StickmanAI", "no se pudo procesar el screenshot", e)
-                                null
-                            } finally {
-                                result.hardwareBuffer.close()
+                // takeScreenshot() itself (not just the async callback) can throw
+                // SecurityException synchronously - "Services don't have the capability of
+                // taking the screenshot" - on OS versions/OEM builds that don't grant it even
+                // with the service enabled. That's a real crash (uncaught = kills the whole
+                // app), not something onFailure() catches, so it needs its own try/catch here.
+                try {
+                    service.takeScreenshot(
+                        Display.DEFAULT_DISPLAY,
+                        ContextCompat.getMainExecutor(service),
+                        object : TakeScreenshotCallback {
+                            override fun onSuccess(result: ScreenshotResult) {
+                                val encoded = try {
+                                    encodeJpeg(result)
+                                } catch (e: Exception) {
+                                    android.util.Log.w("StickmanAI", "no se pudo procesar el screenshot", e)
+                                    null
+                                } finally {
+                                    result.hardwareBuffer.close()
+                                }
+                                android.util.Log.i("StickmanAI", "captureScreenshotBase64: exito, bytes=${encoded?.length}")
+                                cont.resume(encoded)
                             }
-                            cont.resume(encoded)
-                        }
 
-                        override fun onFailure(errorCode: Int) {
-                            cont.resume(null)
-                        }
-                    },
-                )
+                            override fun onFailure(errorCode: Int) {
+                                android.util.Log.w("StickmanAI", "captureScreenshotBase64: fallo, errorCode=$errorCode")
+                                cont.resume(null)
+                            }
+                        },
+                    )
+                } catch (e: SecurityException) {
+                    android.util.Log.w("StickmanAI", "captureScreenshotBase64: sin capacidad de screenshot en este dispositivo/OS", e)
+                    cont.resume(null)
+                }
             }
         }
 

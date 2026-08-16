@@ -86,7 +86,10 @@ object GeminiClient {
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
+        // 20s used to be enough for text-only or text+one-camera-frame requests, but timed out
+        // once the screenshot (a second, larger image) started riding along too - the model
+        // takes longer to respond with two images to look at.
+        .readTimeout(45, TimeUnit.SECONDS)
         .build()
 
     suspend fun decide(
