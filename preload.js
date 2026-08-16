@@ -13,4 +13,6 @@ contextBridge.exposeInMainWorld('stickmanAPI', {
   onChatDefault: (callback) => {
     ipcRenderer.on('stickman:chat-default', (_event, characterId) => callback(characterId));
   },
+  getPcSettings: () => ipcRenderer.invoke('stickman:get-settings'),
+  savePcSettings: (settings) => ipcRenderer.send('stickman:save-settings', settings),
 });

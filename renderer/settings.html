@@ -1,0 +1,88 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Configuracion - Stickman AI</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: #1e1e1e;
+        color: #eee;
+        padding: 16px;
+        box-sizing: border-box;
+      }
+      h2 {
+        margin-top: 0;
+        font-size: 16px;
+      }
+      label {
+        display: block;
+        font-size: 12px;
+        color: #aaa;
+        margin-top: 10px;
+      }
+      select,
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        background: #2a2a2a;
+        color: #eee;
+        border: 1px solid #444;
+        border-radius: 6px;
+        padding: 6px;
+        font-size: 13px;
+        font-family: inherit;
+        margin-top: 2px;
+      }
+      .char-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 6px;
+      }
+      .char-row span {
+        width: 110px;
+        font-size: 13px;
+      }
+      .char-row input {
+        flex: 1;
+        margin-top: 0;
+      }
+      .hint {
+        font-size: 11px;
+        color: #888;
+        margin-top: 4px;
+      }
+      button {
+        margin-top: 16px;
+        width: 100%;
+        padding: 10px;
+        background: #3b82f6;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      button:hover {
+        background: #2563eb;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Configuracion antes de arrancar</h2>
+    <label>Proveedor de IA (compartido por todos)</label>
+    <select id="provider"></select>
+    <label>API key compartida (para el proveedor de arriba)</label>
+    <input id="sharedKey" type="password" placeholder="Opcional si cada uno tiene la suya" />
+    <div class="hint">
+      Tildá los personajes que querés que aparezcan. Las keys por personaje de abajo solo
+      aplican si el proveedor es "gemini" - asi cada uno tiene su propio cupo gratuito en vez de
+      compartir el de arriba.
+    </div>
+    <div id="charList"></div>
+    <button id="continueBtn">Guardar y continuar</button>
+    <script src="settings.js"></script>
+  </body>
+</html>

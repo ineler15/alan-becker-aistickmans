@@ -8,6 +8,7 @@ const userMessage = require('./src/loop/userMessage');
 const webcam = require('./src/loop/webcam');
 const CHARACTERS = require('./src/characters');
 const peerServer = require('./src/net/peerServer');
+const pcSettings = require('./src/pcSettings');
 
 // Without this, launching the app while it's already running spins up a second full set of
 // electron.exe processes and a second javaw.exe Shimeji, fighting over the same hotkeys/webcam -
@@ -136,6 +137,29 @@ function openChatWindow(defaultCharacterId) {
   });
 }
 
+// Shown once at startup, before the Shimeji figures appear - lets the user pick a shared AI
+// provider and per-character API keys instead of hand-editing .env. startShimeji()/agentLoop.start()
+// only run once this window sends 'stickman:save-settings' (see app.whenReady() below).
+let settingsWindow = null;
+
+function createSettingsWindow() {
+  settingsWindow = new BrowserWindow({
+    width: 480,
+    height: 560,
+    title: 'Configuracion - Stickman AI',
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  settingsWindow.loadFile(path.join(__dirname, 'renderer', 'settings.html'));
+  settingsWindow.on('closed', () => {
+    settingsWindow = null;
+  });
+}
+
 function buildTrayMenu() {
   return Menu.buildFromTemplate([
     {
@@ -220,8 +244,22 @@ app.whenReady().then(() => {
     console.warn('No se pudo registrar el hotkey global para el chat: Control+Shift+H');
   }
 
-  startShimeji();
-  agentLoop.start();
+  ipcMain.handle('stickman:get-settings', () => ({
+    providers: pcSettings.PROVIDERS,
+    characters: CHARACTERS.ALL.map((c) => ({ id: c.id, displayName: c.displayName })),
+    settings: pcSettings.load(),
+  }));
+
+  ipcMain.on('stickman:save-settings', (_event, settings) => {
+    pcSettings.save(settings);
+    pcSettings.applyToEnv(settings);
+    pcSettings.applyEnabledCharacters(settings);
+    if (settingsWindow) settingsWindow.close();
+    startShimeji();
+    agentLoop.start();
+  });
+
+  createSettingsWindow();
   peerServer.start();
 });
 
