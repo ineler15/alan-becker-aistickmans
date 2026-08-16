@@ -1,7 +1,6 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, globalShortcut, shell, session, screen } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, globalShortcut, shell, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { spawn, exec } = require('child_process');
 const config = require('./src/config');
 const agentLoop = require('./src/loop/agentLoop');
 const userMessage = require('./src/loop/userMessage');
@@ -9,54 +8,38 @@ const webcam = require('./src/loop/webcam');
 const CHARACTERS = require('./src/characters');
 const peerServer = require('./src/net/peerServer');
 const pcSettings = require('./src/pcSettings');
+const jsCharacterEngine = require('./src/jsEngine/jsCharacterEngine');
 
 // Without this, launching the app while it's already running spins up a second full set of
-// electron.exe processes and a second javaw.exe Shimeji, fighting over the same hotkeys/webcam -
-// the exact "duplicate instance" bug this session kept hitting and fixing by hand with taskkill.
+// electron.exe processes and character windows, fighting over the same hotkeys/webcam - the
+// exact "duplicate instance" bug this session kept hitting and fixing by hand with taskkill.
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 }
 
-let shimejiProcess = null;
-
-// Clears each character's short-term state (position/pose, recent action log, pending
-// commands) on every launch so a restart is a real fresh start - but leaves
-// personality-<id>.json and memory-<id>.json alone, since those are meant to persist.
+// Clears each character's short-term state (position/pose, recent action log) on every launch
+// so a restart is a real fresh start - but leaves personality-<id>.json and memory-<id>.json
+// alone, since those are meant to persist.
 function resetShortTermState() {
   for (const character of CHARACTERS) {
-    for (const prefix of ['history-', 'ai-status-', 'ai-command-']) {
+    for (const prefix of ['history-']) {
       const file = path.join(config.workspaceDir, `${prefix}${character.id}.json`);
       fs.promises.unlink(file).catch(() => {});
     }
   }
 }
 
-function isShimejiRunning() {
-  return new Promise((resolve) => {
-    exec('tasklist /FI "IMAGENAME eq javaw.exe"', (err, stdout) => {
-      resolve(!err && /javaw\.exe/i.test(stdout));
-    });
-  });
+// Each character is its own small transparent always-on-top window (renderer/character.html),
+// drawn from its actual Stick Nodes rig data and driven by jsEngine/characterState.js - the same
+// physics/animation state machine already validated on Android. Replaces the old Shimeji-ee Java
+// process entirely (see jsCharacterEngine.js for the drag-detection/positioning details).
+function startCharacterEngine() {
+  jsCharacterEngine.start(CHARACTERS);
 }
 
-async function startShimeji() {
-  if (await isShimejiRunning()) return;
-  shimejiProcess = spawn(config.shimeji.javaPath, ['-jar', config.shimeji.jarPath], {
-    cwd: path.dirname(config.shimeji.jarPath),
-    detached: true,
-    stdio: 'ignore',
-  });
-  shimejiProcess.on('error', (err) => {
-    console.error('No se pudo iniciar el stickman visual (Java):', err.message);
-  });
-  shimejiProcess.unref();
-}
-
-// The stickman is no longer drawn in its own Electron window - the AI
-// controls a Shimeji-ee character on the Java side instead. Electron just
-// hosts the decision loop and a tray icon for pausing it. This hidden
-// window's only job is rendering that tray icon once via canvas.
+// Electron just hosts the decision loop, the character windows, and a tray icon for pausing it.
+// This hidden window's only job is rendering that tray icon once via canvas.
 let iconWindow = null;
 let tray = null;
 
@@ -137,9 +120,9 @@ function openChatWindow(defaultCharacterId) {
   });
 }
 
-// Shown once at startup, before the Shimeji figures appear - lets the user pick a shared AI
-// provider and per-character API keys instead of hand-editing .env. startShimeji()/agentLoop.start()
-// only run once this window sends 'stickman:save-settings' (see app.whenReady() below).
+// Shown once at startup, before the character windows appear - lets the user pick a shared AI
+// provider and per-character API keys instead of hand-editing .env. startCharacterEngine()/
+// agentLoop.start() only run once this window sends 'stickman:save-settings' (see app.whenReady() below).
 let settingsWindow = null;
 
 function createSettingsWindow() {
@@ -160,44 +143,6 @@ function createSettingsWindow() {
   });
 }
 
-// Proof-of-concept only (see renderer/rig.js) - draws Red from her actual Stick Nodes rig data in
-// a transparent always-on-top window, running ALONGSIDE the existing Shimeji-rendered characters,
-// not replacing anything. Toggled from the tray, off by default. Not wired to position/AI/poses
-// yet - this only validates the renderer itself works inside a real Electron window.
-let rigTestWindow = null;
-
-function toggleRigTestWindow() {
-  if (rigTestWindow) {
-    rigTestWindow.close();
-    return;
-  }
-  // BrowserWindow's width/height are in DIP, which Windows display scaling (e.g. 150%) then
-  // blows up to more physical pixels than intended - dividing by scaleFactor keeps this looking
-  // the size it's supposed to regardless of the user's scaling setting.
-  const scaleFactor = screen.getPrimaryDisplay().scaleFactor || 1;
-  const size = Math.round(220 / scaleFactor);
-  rigTestWindow = new BrowserWindow({
-    width: size,
-    height: size,
-    x: 40,
-    y: 40,
-    frame: false,
-    transparent: true,
-    alwaysOnTop: true,
-    resizable: false,
-    skipTaskbar: true,
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
-  rigTestWindow.setIgnoreMouseEvents(true);
-  rigTestWindow.loadFile(path.join(__dirname, 'renderer', 'rig.html'));
-  rigTestWindow.on('closed', () => {
-    rigTestWindow = null;
-  });
-}
-
 function buildTrayMenu() {
   return Menu.buildFromTemplate([
     {
@@ -211,13 +156,6 @@ function buildTrayMenu() {
       label: `Hablar con ${c.displayName}`,
       click: () => openChatWindow(c.id),
     })),
-    {
-      label: rigTestWindow ? 'Cerrar prueba de rig (Red)' : 'Probar renderer de rig (Red)',
-      click: () => {
-        toggleRigTestWindow()
-        tray.setContextMenu(buildTrayMenu())
-      },
-    },
     {
       label: 'Abrir carpeta workspace',
       click: () => shell.openPath(config.workspaceDir),
@@ -289,16 +227,6 @@ app.whenReady().then(() => {
     console.warn('No se pudo registrar el hotkey global para el chat: Control+Shift+H');
   }
 
-  // Same rig-test toggle as the tray menu item, just reachable without clicking the tray icon -
-  // added so it could be triggered by simulated input (SendKeys) during development.
-  const rigTestRegistered = globalShortcut.register('Control+Shift+R', () => {
-    toggleRigTestWindow();
-    if (tray) tray.setContextMenu(buildTrayMenu());
-  });
-  if (!rigTestRegistered) {
-    console.warn('No se pudo registrar el hotkey global de prueba de rig: Control+Shift+R');
-  }
-
   ipcMain.handle('stickman:get-settings', () => ({
     providers: pcSettings.PROVIDERS,
     characters: CHARACTERS.ALL.map((c) => ({ id: c.id, displayName: c.displayName })),
@@ -309,9 +237,8 @@ app.whenReady().then(() => {
     pcSettings.save(settings);
     pcSettings.applyToEnv(settings);
     pcSettings.applyEnabledCharacters(settings);
-    pcSettings.applyActiveShimeji(settings);
     if (settingsWindow) settingsWindow.close();
-    startShimeji();
+    startCharacterEngine();
     agentLoop.start();
   });
 
@@ -322,6 +249,7 @@ app.whenReady().then(() => {
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
   agentLoop.stop();
+  jsCharacterEngine.stop();
 });
 
 app.on('window-all-closed', () => {

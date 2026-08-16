@@ -118,6 +118,21 @@ const ACTIONS = [
     },
     risky: false,
   },
+  {
+    name: 'set_custom_animation',
+    desc:
+      'En vez de una pose fija de set_animation, crea tu propia animacion: una secuencia de hasta 12 ' +
+      'posturas (keyframes) que se van a reproducir en orden, cada una mantenida un ratito (holdMs) antes ' +
+      'de pasar a la siguiente. Cada keyframe es un angulo (en grados) para las partes del cuerpo que ' +
+      'quieras mover ese paso - las que no incluyas se quedan como estaban. Usalo para gestos o bailes ' +
+      'unicos que no encajan en ninguna pose predefinida.',
+    params: {
+      keyframes:
+        'array de objetos (JSON string o array) - cada uno con angulos opcionales para ' +
+        'torso/leg1/leg1Shin/leg2/leg2Shin/arm1/arm2 (numeros, grados) y holdMs opcional (100-3000, default 400)',
+    },
+    risky: false,
+  },
   { name: 'say', desc: 'Muestra un mensaje en un globo de dialogo junto al personaje, para comunicarse con el usuario', params: { text: 'string' }, risky: false },
   {
     name: 'define_personality',

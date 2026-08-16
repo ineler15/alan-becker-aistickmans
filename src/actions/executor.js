@@ -3,7 +3,7 @@ const input = require('./input');
 const system = require('./system');
 const paint = require('./stickPaint');
 const notepad = require('./notepad');
-const shimeji = require('../../dist/shimejiController');
+const shimeji = require('../jsEngine/jsShimejiController');
 
 async function needsConfirmation(name, args) {
   if (name === 'run_command') return true;
@@ -86,6 +86,13 @@ async function execute(name, args, characterId) {
     case 'say':
       shimeji.sendCommand(characterId, 'say', { text: args.text });
       return { ok: true, result: 'mensaje mostrado' };
+    case 'set_custom_animation': {
+      // Same string-vs-array leniency as draw_in_paint's points - a tool-calling model may hand
+      // back "keyframes" as a JSON-encoded string instead of a real array.
+      const raw = typeof args.keyframes === 'string' ? JSON.parse(args.keyframes) : args.keyframes;
+      shimeji.sendCommand(characterId, 'set_custom_animation', { keyframes: raw || [] });
+      return { ok: true, result: 'animacion personalizada iniciada' };
+    }
     case 'define_personality':
       return { ok: true, result: String(args.description || '').slice(0, 500) };
     case 'remember':

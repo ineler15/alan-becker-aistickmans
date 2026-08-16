@@ -39,33 +39,7 @@ function save(settings) {
   fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2));
 }
 
-// The Java Shimeji engine decides which figures actually appear on screen from its OWN config
-// (conf/settings.properties next to the jar, "ActiveShimeji=Name1/Name2/..."), completely
-// separate from this file / the CHARACTERS array above - checking a character here only
-// controls whether the AI loop drives it, not whether Shimeji draws it at all. Without this,
-// every character ever listed there (including the deleted "AI" one) kept appearing regardless
-// of what was unchecked in the settings window.
-function applyActiveShimeji(settings) {
-  const propsPath = path.join(path.dirname(config.shimeji.jarPath), 'conf', 'settings.properties');
-  let lines;
-  try {
-    lines = fs.readFileSync(propsPath, 'utf8').split(/\r?\n/);
-  } catch (e) {
-    console.warn('No se pudo leer settings.properties de Shimeji:', e.message);
-    return;
-  }
-  const enabledIds = settings.enabledIds && settings.enabledIds.length ? settings.enabledIds : CHARACTERS.ALL.map((c) => c.id);
-  const activeLine = `ActiveShimeji=${enabledIds.join('/')}`;
-  const found = lines.some((line, i) => {
-    if (!line.startsWith('ActiveShimeji=')) return false;
-    lines[i] = activeLine;
-    return true;
-  });
-  if (!found) lines.push(activeLine);
-  fs.writeFileSync(propsPath, lines.join('\n'));
-}
-
-// Applies saved settings into process.env BEFORE startShimeji()/agentLoop.start() are called,
+// Applies saved settings into process.env BEFORE startCharacterEngine()/agentLoop.start() are called,
 // so the existing config.js/provider.js machinery (which reads process.env fresh on every call,
 // see config.gemini.apiKeyFor) picks them up with no changes to that code at all.
 function applyToEnv(settings) {
@@ -94,6 +68,5 @@ module.exports = {
   save,
   applyToEnv,
   applyEnabledCharacters,
-  applyActiveShimeji,
   SETTINGS_PATH,
 };

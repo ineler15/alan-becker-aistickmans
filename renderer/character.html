@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Character</title>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        background: transparent;
+        overflow: hidden;
+        /* Whole window is the drag handle (it's already sized tight around the character) -
+           lets the user grab/drag it like the old Shimeji windows, without needing global
+           click-through hit-testing to know when a click landed "on" the character. */
+        -webkit-app-region: drag;
+      }
+      canvas {
+        display: block;
+        background: transparent;
+      }
+      #speech {
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(255, 255, 255, 0.93);
+        color: #111;
+        padding: 6px 10px;
+        border-radius: 8px;
+        font-family: system-ui, sans-serif;
+        font-size: 12px;
+        max-width: 220px;
+        white-space: normal;
+        text-align: center;
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div style="position: relative; width: 100%; height: 100%;">
+      <div id="speech"></div>
+      <canvas id="c"></canvas>
+    </div>
+    <script src="poseLibrary.js"></script>
+    <script src="character.js"></script>
+  </body>
+</html>
