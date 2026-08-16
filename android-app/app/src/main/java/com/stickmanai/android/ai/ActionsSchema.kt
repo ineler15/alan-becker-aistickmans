@@ -54,7 +54,7 @@ object ActionsSchema {
                 "Expresa una emocion con el cuerpo (no tenes cara).",
                 JSONObject().put(
                     "state",
-                    prop("string", "Estado emocional", listOf("idle", "happy", "trip", "sad", "scared"))
+                    prop("string", "Estado emocional", listOf("idle", "happy", "trip", "sad", "scared", "sit", "angry"))
                 ),
                 listOf("state")
             )

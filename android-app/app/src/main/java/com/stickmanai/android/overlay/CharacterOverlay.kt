@@ -36,7 +36,11 @@ class CharacterOverlay(
         private const val TAP_MAX_MS = 250L
     }
 
-    private val sprites = SpriteSet.forCharacter(context, def.id)
+    // If there's a rigs/<id>.json asset, render bones procedurally via RigView instead of the
+    // raster SpriteSet - see sn_proto_wasm_renderer memory. Only "Red" has one for now; every
+    // other character keeps using sprites untouched.
+    private val rigFigure = RigFigure.forCharacterOrNull(context, def.id)
+    private val sprites = if (rigFigure == null) SpriteSet.forCharacter(context, def.id) else null
     private val density = context.resources.displayMetrics.density
     val sizePx = (128 * density).toInt()
     private val floorY = screenHeightPx - (48 * density).toInt()
@@ -54,9 +58,8 @@ class CharacterOverlay(
     var lastSayText: String? = null
         private set
 
-    private val imageView = ImageView(context).apply {
-        setImageBitmap(sprites.stand)
-    }
+    private val rigView: RigView? = rigFigure?.let { RigView(context, it) }
+    private val characterView: View = rigView ?: ImageView(context).apply { setImageBitmap(sprites!!.stand) }
     private val speechView = TextView(context).apply {
         setBackgroundColor(Color.parseColor("#EEFFFFFF"))
         setTextColor(Color.BLACK)
@@ -87,12 +90,12 @@ class CharacterOverlay(
 
     @SuppressLint("ClickableViewAccessibility")
     fun attach() {
-        imageView.setOnTouchListener { _, event -> handleTouch(event) }
-        windowManager.addView(imageView, imageParams)
+        characterView.setOnTouchListener { _, event -> handleTouch(event) }
+        windowManager.addView(characterView, imageParams)
         windowManager.addView(speechView, speechParams)
-        imageView.viewTreeObserver.addOnGlobalLayoutListener {
+        characterView.viewTreeObserver.addOnGlobalLayoutListener {
             val rect = Rect()
-            imageView.getWindowVisibleDisplayFrame(rect)
+            characterView.getWindowVisibleDisplayFrame(rect)
             val covered = screenHeight - rect.bottom
             // Small covered slivers are just status/nav bar chrome, not a keyboard - require a
             // sizeable chunk before treating it as one.
@@ -102,7 +105,7 @@ class CharacterOverlay(
     }
 
     fun detach() {
-        try { windowManager.removeView(imageView) } catch (e: Exception) { /* already gone */ }
+        try { windowManager.removeView(characterView) } catch (e: Exception) { /* already gone */ }
         try { windowManager.removeView(speechView) } catch (e: Exception) { /* already gone */ }
     }
 
@@ -134,23 +137,37 @@ class CharacterOverlay(
     /** Runs one physics tick and repositions/re-renders both overlay windows. Call every ~40ms on the main thread. */
     fun tick() {
         val kind = state.tick()
-        val bitmap = when (kind) {
-            is CharacterState.FrameKind.Stand -> sprites.stand
-            is CharacterState.FrameKind.Walk -> sprites.walk.frameAt(kind.frame)
-            is CharacterState.FrameKind.Run -> sprites.run.frameAt(kind.frame)
-            is CharacterState.FrameKind.Fall -> sprites.fall.frameAt(kind.frame)
-            is CharacterState.FrameKind.Pinch -> sprites.pinch.frameAt(kind.frame)
-            is CharacterState.FrameKind.Bounce -> sprites.bounce.frameAt(kind.frame)
-            is CharacterState.FrameKind.Trip -> sprites.trip.frameAt(kind.frame)
+        if (rigView != null) {
+            rigView.pose = PoseLibrary.forFrameKind(kind)
+        } else {
+            val bitmap = when (kind) {
+                is CharacterState.FrameKind.Stand -> sprites!!.stand
+                is CharacterState.FrameKind.Walk -> sprites!!.walk.frameAt(kind.frame)
+                is CharacterState.FrameKind.Run -> sprites!!.run.frameAt(kind.frame)
+                is CharacterState.FrameKind.Fall -> sprites!!.fall.frameAt(kind.frame)
+                is CharacterState.FrameKind.Pinch -> sprites!!.pinch.frameAt(kind.frame)
+                is CharacterState.FrameKind.Bounce -> sprites!!.bounce.frameAt(kind.frame)
+                is CharacterState.FrameKind.Trip -> sprites!!.trip.frameAt(kind.frame)
+                // No sprite art for these - sprite-backed characters just stand instead.
+                is CharacterState.FrameKind.Sit, is CharacterState.FrameKind.Angry,
+                is CharacterState.FrameKind.Climb -> sprites!!.stand
+            }
+            (characterView as ImageView).setImageBitmap(bitmap)
         }
-        imageView.setImageBitmap(bitmap)
-        // Sprites face left by default (matches the desktop assets) - mirror only when walking right.
-        imageView.scaleX = if (state.lookRight) -1f else 1f
+        if (state.climbing) {
+            // Rotate to cling to the wall - head points away from the wall it's climbing.
+            characterView.rotation = if (state.climbSide < 0) 90f else -90f
+            characterView.scaleX = 1f
+        } else {
+            characterView.rotation = 0f
+            // Both sprites and the rig face left by default - mirror only when walking right.
+            characterView.scaleX = if (state.lookRight) -1f else 1f
+        }
         render()
     }
 
     private fun List<android.graphics.Bitmap>.frameAt(i: Int): android.graphics.Bitmap =
-        if (isEmpty()) sprites.stand else this[i % size]
+        if (isEmpty()) sprites!!.stand else this[i % size]
 
     private fun render() {
         // Just lifting the character above the keyboard still parks it right at the keyboard's
@@ -160,14 +177,14 @@ class CharacterOverlay(
         // underlying physics (state.x/state.y) keeps running so it resumes normally once the
         // keyboard closes.
         if (keyboardInsetPx > 0) {
-            imageView.visibility = View.GONE
+            characterView.visibility = View.GONE
             speechView.visibility = View.GONE
             return
         }
-        imageView.visibility = View.VISIBLE
+        characterView.visibility = View.VISIBLE
         imageParams.x = state.x - sizePx / 2
         imageParams.y = state.y - sizePx
-        windowManager.updateViewLayout(imageView, imageParams)
+        windowManager.updateViewLayout(characterView, imageParams)
 
         if (state.speechText != null) {
             speechView.text = state.speechText

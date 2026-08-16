@@ -118,12 +118,14 @@ class OverlayService : LifecycleService() {
     private fun startAiLoop() {
         serviceScope.launch {
             while (true) {
-                // One shared camera frame per round, reused by every character this tick -
-                // mirrors the desktop's "one shared screenshot per round" in agentLoop.js so the
-                // cost doesn't multiply with the number of friends.
+                // One shared camera frame (and, if accessibility is on, one shared screenshot)
+                // per round, reused by every character this tick - mirrors the desktop's "one
+                // shared screenshot per round" in agentLoop.js so the cost doesn't multiply with
+                // the number of friends.
                 val cameraBase64 = cameraCapture.captureBase64()
+                val screenBase64 = com.stickmanai.android.input.TapAccessibilityService.captureScreenshotBase64()
                 for (overlay in overlays.values.toList()) {
-                    tickCharacterAi(overlay, cameraBase64)
+                    tickCharacterAi(overlay, cameraBase64, screenBase64)
                 }
                 delay(TICK_INTERVAL_MS)
             }
@@ -169,7 +171,7 @@ class OverlayService : LifecycleService() {
         }
     }
 
-    private suspend fun tickCharacterAi(overlay: CharacterOverlay, cameraBase64: String?) {
+    private suspend fun tickCharacterAi(overlay: CharacterOverlay, cameraBase64: String?, screenBase64: String?) {
         val characterId = overlay.def.id
         val apiKey = Prefs.apiKeyFor(this, characterId)
         if (apiKey.isBlank()) return
@@ -186,6 +188,7 @@ class OverlayService : LifecycleService() {
         try {
             val decision = GeminiClient.decide(
                 apiKey = apiKey,
+                provider = Prefs.providerFor(this, characterId),
                 personality = Prefs.personality(this, characterId),
                 recentHistory = overlay.recentHistory.toList(),
                 memory = Prefs.memory(this, characterId),
@@ -194,6 +197,7 @@ class OverlayService : LifecycleService() {
                 userMessage = userMessage,
                 forceSay = silentStreak >= SILENT_TURN_LIMIT,
                 cameraBase64 = cameraBase64,
+                screenBase64 = screenBase64,
             )
             turnsSinceSay[characterId] = if (decision.tool == "say") 0 else silentStreak + 1
             mainHandler.post { applyDecision(overlay, decision.tool, decision.args) }
@@ -218,7 +222,8 @@ class OverlayService : LifecycleService() {
             "move_random" -> overlay.state.randomTarget(args.optBoolean("run", false))
             "set_animation" -> {
                 val state = args.optString("state", "idle")
-                overlay.state.setEmotion(if (state == "happy" || state == "trip" || state == "sad" || state == "scared") state else null)
+                val validStates = setOf("happy", "trip", "sad", "scared", "sit")
+                overlay.state.setEmotion(if (state in validStates) state else null)
             }
             "say" -> {
                 val text = args.optString("text", "")

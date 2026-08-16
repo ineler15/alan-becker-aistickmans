@@ -22,11 +22,17 @@
             android:layout_marginTop="8dp"
             android:text="@string/grant_accessibility" />
 
+        <Spinner
+            android:id="@+id/spinnerSharedProvider"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp" />
+
         <EditText
             android:id="@+id/editSharedApiKey"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="8dp"
             android:hint="@string/gemini_api_key_hint"
             android:inputType="textPassword" />
 

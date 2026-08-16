@@ -3,11 +3,11 @@
     <string name="grant_overlay">Permitir dibujar sobre otras apps</string>
     <string name="start_service">Iniciar</string>
     <string name="stop_service">Detener</string>
-    <string name="gemini_api_key_hint">API key de Gemini (compartida, opcional si cada uno tiene la suya)</string>
+    <string name="gemini_api_key_hint">API key compartida (segun proveedor elegido arriba, opcional si cada uno tiene la suya)</string>
     <string name="send">Enviar</string>
     <string name="message_hint">Escribile algo…</string>
     <string name="pc_address_hint">IP:puerto de la PC (ej: 192.168.18.27:8787)</string>
-    <string name="tap_accessibility_description">Le permite a tus personajes tocar la pantalla por vos (accion "tap"), como si fueran un dedo. No lee el contenido de la pantalla, solo toca donde el personaje decide.</string>
+    <string name="tap_accessibility_description">Le permite a tus personajes tocar la pantalla por vos (accion "tap"), como si fueran un dedo, y ver una captura de lo que hay en pantalla para poder comentarlo (se manda a la IA junto con tu posicion). No lee texto ni el contenido interno de otras apps, solo la imagen de la pantalla y donde tocar.</string>
     <string name="grant_accessibility">Permitir que toquen la pantalla</string>
     <string name="group_chat">Hablarle a todos (chat grupal)</string>
 </resources>

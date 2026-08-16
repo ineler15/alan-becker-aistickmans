@@ -5,9 +5,11 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.widget.ArrayAdapter
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.Spinner
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -18,6 +20,10 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private val apiKeyFields = HashMap<String, EditText>()
+    private val providerFields = HashMap<String, Spinner>()
+
+    // First entry means "usar el compartido" (empty -> Prefs.providerFor falls back to shared).
+    private val perCharacterProviderOptions = listOf("(compartido)") + Prefs.PROVIDERS
 
     private val requestNotificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* no-op either way */ }
@@ -32,6 +38,8 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        binding.spinnerSharedProvider.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, Prefs.PROVIDERS)
+        binding.spinnerSharedProvider.setSelection(Prefs.PROVIDERS.indexOf(Prefs.sharedProvider(this)).coerceAtLeast(0))
         binding.editSharedApiKey.setText(Prefs.sharedApiKey(this))
         binding.editPcAddress.setText(Prefs.pcAddress(this))
 
@@ -95,7 +103,15 @@ class MainActivity : AppCompatActivity() {
             }
             apiKeyFields[character.id] = apiKeyField
 
+            val providerField = Spinner(this).apply {
+                adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, perCharacterProviderOptions)
+                val current = Prefs.perCharacterProvider(this@MainActivity, character.id)
+                setSelection(if (current.isBlank()) 0 else perCharacterProviderOptions.indexOf(current).coerceAtLeast(0))
+            }
+            providerFields[character.id] = providerField
+
             row.addView(checkBox)
+            row.addView(providerField)
             row.addView(apiKeyField)
             binding.characterList.addView(row)
 
@@ -106,10 +122,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun savePrefs() {
+        Prefs.setSharedProvider(this, binding.spinnerSharedProvider.selectedItem as String)
         Prefs.setSharedApiKey(this, binding.editSharedApiKey.text.toString().trim())
         Prefs.setPcAddress(this, binding.editPcAddress.text.toString().trim())
         for ((characterId, field) in apiKeyFields) {
             Prefs.setApiKeyFor(this, characterId, field.text.toString().trim())
+        }
+        for ((characterId, spinner) in providerFields) {
+            val selected = spinner.selectedItem as String
+            Prefs.setProviderFor(this, characterId, if (selected == perCharacterProviderOptions[0]) "" else selected)
         }
     }
 

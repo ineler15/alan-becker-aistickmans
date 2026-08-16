@@ -20,6 +20,9 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
         const val FALL_TIMEOUT_MS = 4000L
         const val SAY_DURATION_MIN_MS = 8000L
         const val SAY_DURATION_PER_CHAR_MS = 90L
+        const val CLIMB_SPEED = 3
+        const val CLIMB_FRAME_TICKS = 4
+        private const val EDGE_MARGIN = 4
     }
 
     var x: Int = screenWidth / 2
@@ -33,9 +36,17 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
     private var running = false
     private var moveTargetX = 0
 
+    // Wall-climbing: reaching a screen edge while walking climbs it instead of just stopping
+    // there, like vanilla Shimeji's ClimbWall behavior.
+    var climbing = false
+        private set
+    var climbSide = 0 // -1 = climbing the left edge, 1 = climbing the right edge
+        private set
+    private var climbTargetY = 0
+
     private var frame = 0
     private var frameCounter = 0
-    var loopEmotion: String? = null // "happy" (bounce) or "scared"/"trip" (trip) - null = normal walk/stand
+    var loopEmotion: String? = null // "happy" (bounce), "sit", or "scared"/"trip" (trip) - null = normal walk/stand
         private set
     var sayUntil = 0L
         private set
@@ -54,9 +65,20 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
 
     fun startFalling() {
         moving = false
+        climbing = false
         loopEmotion = null
         falling = true
         fallStartedAt = System.currentTimeMillis()
+    }
+
+    private fun startClimbing(side: Int) {
+        climbing = true
+        climbSide = side
+        moving = false
+        loopEmotion = null
+        frame = 0
+        frameCounter = 0
+        climbTargetY = Random.nextInt((screenHeight * 0.1).toInt(), (screenHeight * 0.5).toInt())
     }
 
     fun setEmotion(state: String?) {
@@ -114,12 +136,30 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
             }
             return FrameKind.Fall(frame)
         }
+        if (climbing) {
+            if (kotlin.math.abs(climbTargetY - y) <= CLIMB_SPEED) {
+                y = climbTargetY
+                startFalling()
+                return FrameKind.Fall(0)
+            }
+            y += if (climbTargetY > y) CLIMB_SPEED else -CLIMB_SPEED
+            frameCounter++
+            if (frameCounter >= CLIMB_FRAME_TICKS) {
+                frameCounter = 0
+                frame++
+            }
+            return FrameKind.Climb(frame)
+        }
         if (moving) {
             val speed = if (running) RUN_SPEED else WALK_SPEED
             val ticksPerFrame = if (running) RUN_FRAME_TICKS else WALK_FRAME_TICKS
             if (kotlin.math.abs(moveTargetX - x) <= speed) {
                 x = moveTargetX
                 moving = false
+                if (x <= EDGE_MARGIN || x >= screenWidth - EDGE_MARGIN) {
+                    startClimbing(if (x <= EDGE_MARGIN) -1 else 1)
+                    return FrameKind.Climb(0)
+                }
                 return FrameKind.Stand
             }
             x += if (moveTargetX > x) speed else -speed
@@ -131,23 +171,31 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
             return if (running) FrameKind.Run(frame) else FrameKind.Walk(frame)
         }
         loopEmotion?.let {
+            if (it == "sit") return FrameKind.Sit
             frameCounter++
             if (frameCounter >= WALK_FRAME_TICKS) {
                 frameCounter = 0
                 frame++
             }
-            return if (it == "happy") FrameKind.Bounce(frame) else FrameKind.Trip(frame)
+            return when (it) {
+                "happy" -> FrameKind.Bounce(frame)
+                "angry" -> FrameKind.Angry(frame)
+                else -> FrameKind.Trip(frame)
+            }
         }
         return FrameKind.Stand
     }
 
     sealed class FrameKind {
         object Stand : FrameKind()
+        object Sit : FrameKind()
         data class Walk(val frame: Int) : FrameKind()
         data class Run(val frame: Int) : FrameKind()
         data class Fall(val frame: Int) : FrameKind()
         data class Pinch(val frame: Int) : FrameKind()
         data class Bounce(val frame: Int) : FrameKind()
         data class Trip(val frame: Int) : FrameKind()
+        data class Angry(val frame: Int) : FrameKind()
+        data class Climb(val frame: Int) : FrameKind()
     }
 }

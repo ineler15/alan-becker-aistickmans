@@ -6,6 +6,11 @@ import android.content.Context
 object Prefs {
     private const val FILE = "stickman_prefs"
 
+    // Providers sharing the OpenAI-compatible tool-call shape used by GeminiClient - same
+    // list as the desktop's AI_PROVIDER options minus anthropic/ollama (native Anthropic shape
+    // and localhost-only Ollama don't fit this mobile client).
+    val PROVIDERS = listOf("gemini", "openai", "groq", "openrouter")
+
     // Notes can contain any punctuation/spaces, so join them with a control character
     // the user could never type instead of something like a space or comma.
     private const val MEMORY_SEP = ""
@@ -35,6 +40,24 @@ object Prefs {
 
     fun setApiKeyFor(context: Context, characterId: String, key: String) {
         sp(context).edit().putString("api_key_$characterId", key).apply()
+    }
+
+    fun sharedProvider(context: Context): String = sp(context).getString("shared_provider", "gemini") ?: "gemini"
+
+    fun setSharedProvider(context: Context, provider: String) {
+        sp(context).edit().putString("shared_provider", provider).apply()
+    }
+
+    fun providerFor(context: Context, characterId: String): String {
+        val perCharacter = sp(context).getString("provider_$characterId", "") ?: ""
+        return perCharacter.ifBlank { sharedProvider(context) }
+    }
+
+    fun perCharacterProvider(context: Context, characterId: String): String =
+        sp(context).getString("provider_$characterId", "") ?: ""
+
+    fun setProviderFor(context: Context, characterId: String, provider: String) {
+        sp(context).edit().putString("provider_$characterId", provider).apply()
     }
 
     fun personality(context: Context, characterId: String): String =
