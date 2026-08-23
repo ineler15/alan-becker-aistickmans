@@ -311,12 +311,22 @@ class OverlayService : LifecycleService() {
             "remember" -> Prefs.addMemory(this, overlay.def.id, args.optString("note", ""))
             "open_app" -> openUrl(args.optString("url", ""))
             "tap" -> {
-                val xPct = args.optDouble("x", 50.0).coerceIn(0.0, 100.0)
-                val yPct = args.optDouble("y", 50.0).coerceIn(0.0, 100.0)
-                com.stickmanai.android.input.TapAccessibilityService.tapAt(
-                    (xPct / 100 * metrics.widthPixels).toFloat(),
-                    (yPct / 100 * metrics.heightPixels).toFloat(),
-                )
+                if (Prefs.allowScreenControl(this)) {
+                    val xPct = args.optDouble("x", 50.0).coerceIn(0.0, 100.0)
+                    val yPct = args.optDouble("y", 50.0).coerceIn(0.0, 100.0)
+                    val targetX = (xPct / 100 * metrics.widthPixels).toFloat()
+                    val targetY = (yPct / 100 * metrics.heightPixels).toFloat()
+                    TouchPointerOverlay.animateAndTap(
+                        this, windowManager,
+                        overlay.state.x.toFloat(), overlay.state.y.toFloat(),
+                        targetX, targetY,
+                        overlay.pointerColor,
+                    ) {
+                        com.stickmanai.android.input.TapAccessibilityService.tapAt(targetX, targetY)
+                    }
+                }
+                // Silently does nothing if not activated in MainActivity - same "no insistas"
+                // pattern as the schema description tells the model.
             }
             "wait" -> { /* no-op */ }
         }

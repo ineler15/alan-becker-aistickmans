@@ -163,8 +163,10 @@ object ActionsSchema {
             tool(
                 "tap",
                 "Toca la pantalla del celular en una posicion (0-100% del ancho y alto), como si " +
-                    "fuera un dedo. Requiere que el usuario haya habilitado el permiso de accesibilidad; " +
-                    "si no, no pasa nada. Usalo con cuidado y solo cuando de verdad tenga sentido tocar algo puntual.",
+                    "fuera un dedo. Requiere que el usuario haya habilitado el permiso de accesibilidad " +
+                    "Y activado el control de pantalla en la pantalla principal de la app; si no, no pasa " +
+                    "nada, no insistas turno tras turno. Usalo con cuidado y solo cuando de verdad tenga " +
+                    "sentido tocar algo puntual.",
                 withFaceParams(
                     JSONObject()
                         .put("x", prop("number", "Posicion horizontal, 0-100% del ancho"))

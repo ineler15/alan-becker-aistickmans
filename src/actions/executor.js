@@ -1,9 +1,19 @@
 const { confirmAction, isInsideWorkspace } = require('../safety/confirm');
+const config = require('../config');
 const input = require('./input');
 const system = require('./system');
 const paint = require('./stickPaint');
 const notepad = require('./notepad');
 const shimeji = require('../jsEngine/jsShimejiController');
+const pointerHighlight = require('../ui/pointerHighlight');
+
+// Off by default (see pcSettings.js) - moving the real OS mouse/clicking on the user's actual
+// desktop is meaningfully bigger than any of the sandboxed actions (StickPaint, walking around,
+// etc.), so it needs an explicit opt-in in Settings rather than working unconditionally.
+const MOUSE_CONTROL_DISABLED_RESULT = {
+  ok: false,
+  result: 'El control de mouse/pantalla esta desactivado - activalo en Configuracion si queres que lo use.',
+};
 
 async function needsConfirmation(name, args) {
   if (name === 'run_command') return true;
@@ -24,16 +34,23 @@ async function execute(name, args, characterId) {
     case 'close_app':
       return { ok: true, result: await system.closeApp(args.processName) };
     case 'move_mouse':
+      if (!config.allowMouseControl) return MOUSE_CONTROL_DISABLED_RESULT;
+      await pointerHighlight.showFor(characterId, args.x, args.y);
       return { ok: true, result: await input.moveMouse(args.x, args.y) };
     case 'walk_to':
       shimeji.sendCommand(characterId, 'walk_to', { x: args.x, y: args.y, run: args.run });
       return { ok: true, result: `orden enviada: ${args.run ? 'correr' : 'caminar'} a (${args.x}, ${args.y})` };
     case 'ride_mouse':
+      // Not gated by allowMouseControl - this just visually rides along wherever the user's own
+      // cursor already is, it never moves or clicks anything, so it isn't the same safety concern.
       shimeji.sendCommand(characterId, 'ride_mouse', { seconds: args.seconds });
       return { ok: true, result: 'orden enviada: subirse al cursor del mouse' };
     case 'click':
+      if (!config.allowMouseControl) return MOUSE_CONTROL_DISABLED_RESULT;
       return { ok: true, result: await input.click(args.button) };
     case 'tap':
+      if (!config.allowMouseControl) return MOUSE_CONTROL_DISABLED_RESULT;
+      await pointerHighlight.showFor(characterId, args.x, args.y);
       await input.tap(args.x, args.y, args.button);
       return { ok: true, result: `tap en (${args.x}, ${args.y})` };
     case 'type_text':

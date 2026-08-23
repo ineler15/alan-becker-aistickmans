@@ -68,6 +68,7 @@ async function init() {
   }
 
   document.getElementById('sharedKey').value = settings.sharedApiKey || '';
+  document.getElementById('allowMouseControl').checked = !!settings.allowMouseControl;
 
   await renderCharacterList(providers);
 
@@ -89,6 +90,7 @@ async function init() {
       perCharacterKeys,
       perCharacterProvider: perCharacterProviderOut,
       enabledIds: enabled,
+      allowMouseControl: document.getElementById('allowMouseControl').checked,
     });
   });
 }

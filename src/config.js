@@ -118,6 +118,11 @@ const config = {
     return this.aiProvider === 'groq' ? 35000 : 0;
   },
   pauseHotkey: process.env.PAUSE_HOTKEY || 'Control+Alt+P',
+  // Off by default (see pcSettings.js) - gates move_mouse/click/tap/ride_mouse in
+  // src/actions/executor.js so an AI can't take over the real mouse without explicit opt-in.
+  get allowMouseControl() {
+    return process.env.ALLOW_MOUSE_CONTROL === '1';
+  },
   stickmanColor: process.env.STICKMAN_COLOR || '#111111',
   shimeji: {
     javaPath: process.env.SHIMEJI_JAVA_PATH || 'C:\\Program Files (x86)\\Java\\jre1.8.0_501\\bin\\javaw.exe',

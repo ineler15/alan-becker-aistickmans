@@ -42,6 +42,9 @@ class CharacterOverlay(
     // other character keeps using sprites untouched.
     private val rigFigure = RigFigure.forCharacterOrNull(context, def.id)
     private val sprites = if (rigFigure == null) SpriteSet.forCharacter(context, def.id) else null
+    // Tints TouchPointerOverlay's dot so with several characters able to tap (see
+    // Prefs.allowScreenControl), it's visually clear which one is doing it right now.
+    val pointerColor: Int get() = rigFigure?.bodyColor ?: Color.WHITE
     // A custom character's own id isn't in PoseLibrary's PROFILE_BY_ID - use whichever built-in
     // profile (Red/TCO) its rig was cloned from instead, so it actually animates. hasFace/gender
     // drive RigView's face+accessory drawing. null (built-in character) means no face, no

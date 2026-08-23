@@ -8,7 +8,14 @@ const ACTIONS = [
     risky: false,
   },
   { name: 'close_app', desc: 'Cierra un proceso por nombre', params: { processName: 'string' }, risky: true },
-  { name: 'move_mouse', desc: 'Mueve el cursor a coordenadas x,y', params: { x: 'number', y: 'number' }, risky: false },
+  {
+    name: 'move_mouse',
+    desc:
+      'Mueve el cursor real a coordenadas x,y. El usuario tiene que haber activado el control de ' +
+      'mouse en Configuracion - si no lo activo, esto no hace nada, no insistas turno tras turno.',
+    params: { x: 'number', y: 'number' },
+    risky: false,
+  },
   {
     name: 'walk_to',
     desc:
@@ -31,12 +38,20 @@ const ACTIONS = [
     params: { seconds: 'number (opcional, default 6)' },
     risky: false,
   },
-  { name: 'click', desc: 'Hace click con el mouse en la posicion actual', params: { button: 'string (left|right|middle, opcional)' }, risky: false },
+  {
+    name: 'click',
+    desc:
+      'Hace click con el mouse real en la posicion actual. Requiere que el usuario haya activado ' +
+      'el control de mouse en Configuracion - si no, no hace nada.',
+    params: { button: 'string (left|right|middle, opcional)' },
+    risky: false,
+  },
   {
     name: 'tap',
     desc:
-      'Mueve el mouse a x,y y hace click ahi mismo, en un solo paso (en vez de move_mouse y ' +
-      'despues click por separado). Usalo cuando ya sabes exactamente donde clickear.',
+      'Mueve el mouse real a x,y y hace click ahi mismo, en un solo paso (en vez de move_mouse y ' +
+      'despues click por separado). Usalo cuando ya sabes exactamente donde clickear. Requiere ' +
+      'que el usuario haya activado el control de mouse en Configuracion - si no, no hace nada.',
     params: { x: 'number', y: 'number', button: 'string (left|right|middle, opcional)' },
     risky: false,
   },

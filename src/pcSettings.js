@@ -23,6 +23,10 @@ function load() {
       // No settings file yet (first run) - default to the same subset that used to be
       // hardcoded in characters.js, so behavior is unchanged until the user touches a checkbox.
       enabledIds: CHARACTERS.map((c) => c.id),
+      // Off by default - letting an AI move the real mouse/click on its own is a meaningfully
+      // bigger deal than any of the sandboxed actions (StickPaint, walking, etc.), so it needs an
+      // explicit opt-in rather than working out of the box like everything else.
+      allowMouseControl: false,
     };
   }
 }
@@ -54,6 +58,7 @@ const KEY_ENV_VAR = {
 // so the existing config.js/provider.js machinery (which reads process.env fresh on every call,
 // see config.gemini.apiKeyFor) picks them up with no changes to that code at all.
 function applyToEnv(settings) {
+  process.env.ALLOW_MOUSE_CONTROL = settings.allowMouseControl ? '1' : '0';
   if (settings.provider) process.env.AI_PROVIDER = settings.provider;
   const keyEnvVar = KEY_ENV_VAR[settings.provider];
   if (keyEnvVar && settings.sharedApiKey) process.env[keyEnvVar] = settings.sharedApiKey;

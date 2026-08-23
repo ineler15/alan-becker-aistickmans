@@ -42,6 +42,10 @@ class MainActivity : AppCompatActivity() {
         binding.spinnerSharedProvider.setSelection(Prefs.PROVIDERS.indexOf(Prefs.sharedProvider(this)).coerceAtLeast(0))
         binding.editSharedApiKey.setText(Prefs.sharedApiKey(this))
         binding.editPcAddress.setText(Prefs.pcAddress(this))
+        binding.checkAllowScreenControl.isChecked = Prefs.allowScreenControl(this)
+        binding.checkAllowScreenControl.setOnCheckedChangeListener { _, checked ->
+            Prefs.setAllowScreenControl(this, checked)
+        }
 
         buildCharacterRows()
 

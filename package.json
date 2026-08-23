@@ -1,6 +1,6 @@
 {
   "name": "stickman-ia",
-  "version": "2.8.0",
+  "version": "2.9.0",
   "description": "Stickman de escritorio con IA real que puede manipular la PC (estilo Alan Becker)",
   "main": "main.js",
   "private": true,

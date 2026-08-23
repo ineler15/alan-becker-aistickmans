@@ -153,6 +153,15 @@ object Prefs {
         return null
     }
 
+    // Off by default - letting the AI actually tap the screen (beyond the accessibility
+    // permission grant itself) is a meaningfully bigger deal than everything else it can do, so
+    // it needs an explicit opt-in. Mirrors the desktop's allowMouseControl (pcSettings.js).
+    fun allowScreenControl(context: Context): Boolean = sp(context).getBoolean("allow_screen_control", false)
+
+    fun setAllowScreenControl(context: Context, allowed: Boolean) {
+        sp(context).edit().putBoolean("allow_screen_control", allowed).apply()
+    }
+
     // "ip:puerto" of the desktop app's peer server (src/net/peerServer.js), so the tablet's
     // characters and the PC's characters can see each other - same LAN only, entered by hand
     // since there's no device discovery here.
