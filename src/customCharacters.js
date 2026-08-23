@@ -85,7 +85,7 @@ function buildRig(color, headModel) {
   return template;
 }
 
-function create({ displayName, color, headModel, hasFace, gender }) {
+function create({ displayName, color, headModel, hasFace, gender, accessory }) {
   const name = (displayName || '').trim() || 'Stickman';
   const id = sanitizeId(name);
   const rig = buildRig(color, headModel);
@@ -93,7 +93,16 @@ function create({ displayName, color, headModel, hasFace, gender }) {
   fs.mkdirSync(CUSTOM_RIGS_DIR, { recursive: true });
   fs.writeFileSync(path.join(CUSTOM_RIGS_DIR, `${id}.json`), JSON.stringify(rig));
 
-  const record = { id, displayName: name, color, headModel, hasFace: !!hasFace, gender: gender || 'otro' };
+  const record = {
+    id,
+    displayName: name,
+    color,
+    headModel,
+    hasFace: !!hasFace,
+    gender: gender || 'otro',
+    // Free choice, independent of gender - see renderer/face.js's drawAccessory().
+    accessory: ['hair', 'bow'].includes(accessory) ? accessory : 'none',
+  };
   const list = load();
   list.push(record);
   save(list);
@@ -117,6 +126,7 @@ function metaFor(id) {
     poseProfile: POSE_PROFILE_BY_HEAD_MODEL[record.headModel] || 'Red',
     hasFace: !!record.hasFace,
     gender: record.gender || 'otro',
+    accessory: record.accessory || 'none',
   };
 }
 

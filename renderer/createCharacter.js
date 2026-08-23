@@ -50,7 +50,7 @@ function colorCss(rgba) {
   return `rgba(${rgba[0]},${rgba[1]},${rgba[2]},${rgba[3] / 255})`;
 }
 
-function draw(ctx, canvas, figure, hasFaceOn, genderVal) {
+function draw(ctx, canvas, figure, hasFaceOn, accessoryVal) {
   const bones = layout(figure.root, 0, { x: 0, y: 0 }, []);
   if (!bones.length) return;
   const b = bounds(bones);
@@ -144,7 +144,7 @@ function draw(ctx, canvas, figure, hasFaceOn, genderVal) {
 
   if (headAnchor) {
     if (hasFaceOn) window.FaceRenderer.drawFace(ctx, headAnchor.x, headAnchor.y, headAnchor.r, 'normal', 'neutral');
-    window.FaceRenderer.drawGenderAccessory(ctx, headAnchor.x, headAnchor.y, headAnchor.r, genderVal);
+    window.FaceRenderer.drawAccessory(ctx, headAnchor.x, headAnchor.y, headAnchor.r, accessoryVal);
   }
 }
 
@@ -178,12 +178,16 @@ function genderValue() {
   return document.querySelector('input[name="gender"]:checked').value;
 }
 
+function accessoryValue() {
+  return document.querySelector('input[name="accessory"]:checked').value;
+}
+
 function redraw() {
   const template = templates[headModel()];
   if (!template || !selectedColor) return;
   const figure = JSON.parse(JSON.stringify(template));
   figure.color = selectedColor;
-  draw(ctx, canvas, figure, hasFaceChecked(), genderValue());
+  draw(ctx, canvas, figure, hasFaceChecked(), accessoryValue());
 }
 
 async function init() {
@@ -220,6 +224,7 @@ colorPicker.addEventListener('input', () => {
 
 document.querySelectorAll('input[name="head"]').forEach((el) => el.addEventListener('change', redraw));
 document.querySelectorAll('input[name="gender"]').forEach((el) => el.addEventListener('change', redraw));
+document.querySelectorAll('input[name="accessory"]').forEach((el) => el.addEventListener('change', redraw));
 document.getElementById('hasFace').addEventListener('change', redraw);
 
 createBtn.addEventListener('click', () => {
@@ -234,6 +239,7 @@ createBtn.addEventListener('click', () => {
     headModel: headModel(),
     hasFace: hasFaceChecked(),
     gender: genderValue(),
+    accessory: accessoryValue(),
   });
   window.close();
 });

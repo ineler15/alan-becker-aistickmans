@@ -34,6 +34,7 @@ class CreateCharacterActivity : AppCompatActivity() {
         binding.headGroup.setOnCheckedChangeListener { _, _ -> updatePreview() }
         binding.checkHasFace.setOnCheckedChangeListener { _, _ -> updatePreview() }
         binding.genderGroup.setOnCheckedChangeListener { _, _ -> updatePreview() }
+        binding.accessoryGroup.setOnCheckedChangeListener { _, _ -> updatePreview() }
         updatePreview()
 
         binding.btnCreate.setOnClickListener {
@@ -43,7 +44,7 @@ class CreateCharacterActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
             val headModel = if (isHollow()) "hollow" else "normal"
-            val def = Prefs.addCustomCharacter(this, name, headModel, binding.checkHasFace.isChecked, genderValue())
+            val def = Prefs.addCustomCharacter(this, name, headModel, binding.checkHasFace.isChecked, genderValue(), accessoryValue())
             val rig = RigTemplate.build(this, selectedColor, isHollow())
             RigTemplate.save(this, def.id, rig)
             finish()
@@ -56,6 +57,12 @@ class CreateCharacterActivity : AppCompatActivity() {
         binding.radioMasculino.id -> "masculino"
         binding.radioFemenino.id -> "femenino"
         else -> "otro"
+    }
+
+    private fun accessoryValue(): String = when (binding.accessoryGroup.checkedRadioButtonId) {
+        binding.radioAccessoryHair.id -> "hair"
+        binding.radioAccessoryBow.id -> "bow"
+        else -> "none"
     }
 
     private fun buildSwatches() {
@@ -120,7 +127,7 @@ class CreateCharacterActivity : AppCompatActivity() {
         val rig = RigTemplate.build(this, selectedColor, isHollow())
         val figure = RigFigure.fromJson(rig)
         binding.previewContainer.removeAllViews()
-        previewView = RigView(this, figure, hasFace = binding.checkHasFace.isChecked, gender = genderValue()).apply {
+        previewView = RigView(this, figure, hasFace = binding.checkHasFace.isChecked, accessory = accessoryValue()).apply {
             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         }
         binding.previewContainer.addView(previewView)

@@ -114,6 +114,7 @@ object Prefs {
         headModel: String,
         hasFace: Boolean,
         gender: String,
+        accessory: String,
     ): CharacterDef {
         val base = displayName.filter { it.isLetterOrDigit() }.ifBlank { "Stickman" }
         // Case-insensitive: Android's storage isn't case-sensitive either, and mirroring PC's
@@ -135,13 +136,14 @@ object Prefs {
         entry.put("headModel", headModel)
         entry.put("hasFace", hasFace)
         entry.put("gender", gender)
+        entry.put("accessory", if (accessory == "hair" || accessory == "bow") accessory else "none")
         array.put(entry)
         sp(context).edit().putString("custom_characters", array.toString()).apply()
         return def
     }
 
     /** poseProfile is PoseLibrary's PROFILE_BY_ID key (built-ins don't need one - the caller keeps using its own id). */
-    data class CustomCharacterMeta(val poseProfile: String, val hasFace: Boolean, val gender: String)
+    data class CustomCharacterMeta(val poseProfile: String, val hasFace: Boolean, val gender: String, val accessory: String)
 
     // PoseLibrary's PROFILE_BY_ID only knows built-in ids - a custom character's rig is always an
     // exact clone of Red's (headModel "normal") or TCO's (headModel "hollow") rig, so pointing
@@ -160,6 +162,7 @@ object Prefs {
                     poseProfile = poseProfile,
                     hasFace = obj.optBoolean("hasFace", false),
                     gender = obj.optString("gender", "otro"),
+                    accessory = obj.optString("accessory", "none"),
                 )
             }
         }

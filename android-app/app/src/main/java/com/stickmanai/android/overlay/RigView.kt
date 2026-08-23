@@ -18,7 +18,7 @@ class RigView(
     context: Context,
     private val figure: RigFigure,
     private val hasFace: Boolean = false,
-    private val gender: String = "otro",
+    private val accessory: String = "none",
 ) : View(context) {
 
     var pose: Pose = emptyMap()
@@ -153,7 +153,7 @@ class RigView(
 
         headCenter?.let { center ->
             if (hasFace) FaceRenderer.drawFace(canvas, center.x, center.y, headRadius, eyeStyle, mouthStyle)
-            FaceRenderer.drawGenderAccessory(canvas, center.x, center.y, headRadius, gender)
+            FaceRenderer.drawAccessory(canvas, center.x, center.y, headRadius, accessory)
         }
     }
 }

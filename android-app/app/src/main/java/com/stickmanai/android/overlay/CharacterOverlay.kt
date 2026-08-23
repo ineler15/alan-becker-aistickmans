@@ -61,7 +61,7 @@ class CharacterOverlay(
         private set
 
     private val rigView: RigView? = rigFigure?.let {
-        RigView(context, it, hasFace = customMeta?.hasFace ?: false, gender = customMeta?.gender ?: "otro")
+        RigView(context, it, hasFace = customMeta?.hasFace ?: false, accessory = customMeta?.accessory ?: "none")
     }
     private val characterView: View = rigView ?: ImageView(context).apply { setImageBitmap(sprites!!.stand) }
     private val speechView = TextView(context).apply {

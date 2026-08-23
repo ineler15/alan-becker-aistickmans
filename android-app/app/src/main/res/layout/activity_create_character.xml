@@ -156,6 +156,41 @@
 
         </RadioGroup>
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/create_character_accessory" />
+
+        <RadioGroup
+            android:id="@+id/accessoryGroup"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/radioAccessoryNone"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="@string/create_character_accessory_none" />
+
+            <RadioButton
+                android:id="@+id/radioAccessoryHair"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="@string/create_character_accessory_hair" />
+
+            <RadioButton
+                android:id="@+id/radioAccessoryBow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="@string/create_character_accessory_bow" />
+
+        </RadioGroup>
+
         <FrameLayout
             android:id="@+id/previewContainer"
             android:layout_width="match_parent"

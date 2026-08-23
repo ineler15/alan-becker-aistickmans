@@ -85,11 +85,10 @@
     drawMouth(ctx, cx, cy, r, MOUTH_STYLES.includes(mouthStyle) ? mouthStyle : 'neutral');
   }
 
-  // A small bow sitting on top of the head - the only gender-driven visual difference (see
-  // src/customCharacters.js), classic minimal stick-figure pictogram convention. Masculino/otro
-  // draw nothing.
-  function drawGenderAccessory(ctx, cx, cy, r, gender) {
-    if (gender !== 'femenino') return;
+  // Optional head accessory, freely chosen at character creation (see src/customCharacters.js) -
+  // independent of gender, classic minimal stick-figure pictogram convention. 'none' draws
+  // nothing.
+  function drawBow(ctx, cx, cy, r) {
     const by = cy - r * 0.95;
     const wing = r * 0.3;
     ctx.fillStyle = '#e0409a';
@@ -106,5 +105,26 @@
     ctx.fill();
   }
 
-  window.FaceRenderer = { EYE_STYLES, MOUTH_STYLES, drawFace, drawGenderAccessory };
+  function drawHair(ctx, cx, cy, r) {
+    ctx.fillStyle = '#3a2a1a';
+    ctx.beginPath();
+    ctx.arc(cx, cy - r * 0.35, r * 1.05, Math.PI, 0);
+    ctx.closePath();
+    ctx.fill();
+    for (const sign of [-1, 0, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(cx + sign * r * 0.55, cy - r * 0.75);
+      ctx.lineTo(cx + sign * r * 0.7, cy - r * 1.25);
+      ctx.lineTo(cx + sign * r * 0.35, cy - r * 0.8);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  function drawAccessory(ctx, cx, cy, r, accessory) {
+    if (accessory === 'bow') drawBow(ctx, cx, cy, r);
+    else if (accessory === 'hair') drawHair(ctx, cx, cy, r);
+  }
+
+  window.FaceRenderer = { EYE_STYLES, MOUTH_STYLES, drawFace, drawAccessory };
 })();

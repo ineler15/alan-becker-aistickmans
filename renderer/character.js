@@ -13,10 +13,11 @@ const characterId = params.get('id');
 // resolves which built-in profile its rig was cloned from (Red/TCO) and passes it here so it
 // actually animates. Absent for built-in characters, which just use their own id as before.
 const poseId = params.get('poseProfile') || characterId;
-// Face/gender accessory - only ever set for custom characters (see customCharacters.js's
-// metaFor()); built-in characters get neither, same as before this existed.
+// Face/accessory - only ever set for custom characters (see customCharacters.js's metaFor());
+// built-in characters get neither, same as before this existed. Accessory (hair/bow/none) is a
+// free choice independent of gender.
 const hasFace = params.get('hasFace') === '1';
-const gender = params.get('gender') || 'otro';
+const accessory = params.get('accessory') || 'none';
 let currentEyeStyle = 'normal';
 let currentMouthStyle = 'neutral';
 // The rig's own visual box (jsCharacterEngine.js's RIG_WIDTH/RIG_HEIGHT) - kept separate from the
@@ -213,7 +214,7 @@ function draw() {
 
   if (headAnchor) {
     if (hasFace) window.FaceRenderer.drawFace(ctx, headAnchor.x, headAnchor.y, headAnchor.r, currentEyeStyle, currentMouthStyle);
-    window.FaceRenderer.drawGenderAccessory(ctx, headAnchor.x, headAnchor.y, headAnchor.r, gender);
+    window.FaceRenderer.drawAccessory(ctx, headAnchor.x, headAnchor.y, headAnchor.r, accessory);
   }
 }
 

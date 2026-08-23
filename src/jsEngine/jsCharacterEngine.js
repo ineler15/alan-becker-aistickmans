@@ -83,6 +83,7 @@ function createWindow(character, startX, startY, size) {
       query.poseProfile = meta.poseProfile;
       if (meta.hasFace) query.hasFace = '1';
       query.gender = meta.gender;
+      query.accessory = meta.accessory;
     }
   }
   win.loadFile(path.join(__dirname, '..', '..', 'renderer', 'character.html'), { query });

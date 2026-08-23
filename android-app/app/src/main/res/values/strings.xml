@@ -26,4 +26,8 @@
     <string name="create_character_gender_masculino">Masculino</string>
     <string name="create_character_gender_femenino">Femenino</string>
     <string name="create_character_gender_otro">Otro</string>
+    <string name="create_character_accessory">Accesorio</string>
+    <string name="create_character_accessory_none">Ninguno</string>
+    <string name="create_character_accessory_hair">Pelo</string>
+    <string name="create_character_accessory_bow">Moño</string>
 </resources>

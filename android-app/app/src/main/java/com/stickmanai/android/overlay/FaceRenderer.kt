@@ -22,6 +22,7 @@ object FaceRenderer {
         color = Color.BLACK
     }
     private val fillBow = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = Color.parseColor("#e0409a") }
+    private val fillHair = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = Color.parseColor("#3a2a1a") }
 
     private fun drawEyes(canvas: Canvas, cx: Float, cy: Float, r: Float, style: String) {
         val dx = r * 0.35f
@@ -92,9 +93,7 @@ object FaceRenderer {
         drawMouth(canvas, cx, cy, r, if (MOUTH_STYLES.contains(mouthStyle)) mouthStyle!! else "neutral")
     }
 
-    /** A small bow sitting on top of the head - the only gender-driven visual difference (see Prefs.kt). */
-    fun drawGenderAccessory(canvas: Canvas, cx: Float, cy: Float, r: Float, gender: String?) {
-        if (gender != "femenino") return
+    private fun drawBow(canvas: Canvas, cx: Float, cy: Float, r: Float) {
         val by = cy - r * 0.95f
         val wing = r * 0.3f
         for (sign in intArrayOf(-1, 1)) {
@@ -107,5 +106,28 @@ object FaceRenderer {
             canvas.drawPath(path, fillBow)
         }
         canvas.drawCircle(cx, by, wing * 0.28f, fillBow)
+    }
+
+    private fun drawHair(canvas: Canvas, cx: Float, cy: Float, r: Float) {
+        val rect = android.graphics.RectF(cx - r * 1.05f, cy - r * 0.35f - r * 1.05f, cx + r * 1.05f, cy - r * 0.35f + r * 1.05f)
+        val path = Path().apply { addArc(rect, 180f, 180f); close() }
+        canvas.drawPath(path, fillHair)
+        for (sign in intArrayOf(-1, 0, 1)) {
+            val tuft = Path().apply {
+                moveTo(cx + sign * r * 0.55f, cy - r * 0.75f)
+                lineTo(cx + sign * r * 0.7f, cy - r * 1.25f)
+                lineTo(cx + sign * r * 0.35f, cy - r * 0.8f)
+                close()
+            }
+            canvas.drawPath(tuft, fillHair)
+        }
+    }
+
+    /** Optional head accessory, freely chosen at character creation (see Prefs.kt) - independent of gender. */
+    fun drawAccessory(canvas: Canvas, cx: Float, cy: Float, r: Float, accessory: String?) {
+        when (accessory) {
+            "bow" -> drawBow(canvas, cx, cy, r)
+            "hair" -> drawHair(canvas, cx, cy, r)
+        }
     }
 }
