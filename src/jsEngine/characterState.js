@@ -1,9 +1,10 @@
 // Physics/animation-state state machine for the JS-native rig renderer replacing Shimeji on PC -
-// a straight port of the Android app's CharacterState.kt (same priority chain: dragged > custom
-// animation > sleeping > falling > moving > loop emotion > idle/auto-sleep), since that one was
-// already iterated on live until it felt right. Runs in the Electron MAIN process (one instance
-// per character) - tick() returns a small JSON-serializable descriptor sent over IPC to that
-// character's own renderer window, which turns it into actual bone angles (see renderer/poseLibrary.js).
+// a straight port of the Android app's CharacterState.kt (same priority chain: dragged > riding
+// mouse > custom animation > sleeping > falling > moving > loop emotion > idle/auto-sleep), since
+// that one was already iterated on live until it felt right. Runs in the Electron MAIN process
+// (one instance per character) - tick() returns a small JSON-serializable descriptor sent over
+// IPC to that character's own renderer window, which turns it into actual bone angles (see
+// renderer/poseLibrary.js).
 
 const TICK_MS = 40;
 const WALK_SPEED = 3;
@@ -50,6 +51,13 @@ class CharacterState {
     this.running = false;
     this.moveTargetX = 0;
 
+    // ride_mouse: rides along the REAL OS cursor position for a timed duration. See input.js's
+    // getMousePosition() and jsCharacterEngine.js's tick(), which fetches it once per tick and
+    // passes it in here (only when at least one character is actually riding, to avoid the extra
+    // native call otherwise).
+    this.ridingMouse = false;
+    this.rideMouseUntil = 0;
+
     this.sleeping = false;
     this.awakeSinceMs = Date.now();
     this.sleepStartedAt = 0;
@@ -78,6 +86,7 @@ class CharacterState {
     this.lastActiveAt = Date.now();
     this.beingDragged = false;
     this.falling = false;
+    this.ridingMouse = false;
     this.loopEmotion = null;
     this.customAnimation = null;
     this.moving = true;
@@ -93,10 +102,25 @@ class CharacterState {
   startFalling() {
     this.lastActiveAt = Date.now();
     this.moving = false;
+    this.ridingMouse = false;
     this.loopEmotion = null;
     this.customAnimation = null;
     this.falling = true;
     this.fallStartedAt = Date.now();
+  }
+
+  // Rides along the real OS cursor position for `seconds` (default 6, capped 1-20) - see
+  // jsCharacterEngine.js's tick(), which feeds the current mouse position into tick() below.
+  startRideMouse(seconds) {
+    this.lastActiveAt = Date.now();
+    this.beingDragged = false;
+    this.falling = false;
+    this.moving = false;
+    this.loopEmotion = null;
+    this.customAnimation = null;
+    if (this.sleeping) this._wakeUp();
+    this.ridingMouse = true;
+    this.rideMouseUntil = Date.now() + Math.min(20, Math.max(1, Number(seconds) || 6)) * 1000;
   }
 
   startCustomAnimation(keyframes) {
@@ -105,6 +129,7 @@ class CharacterState {
     this.beingDragged = false;
     this.falling = false;
     this.moving = false;
+    this.ridingMouse = false;
     this.loopEmotion = null;
     if (this.sleeping) this._wakeUp();
     this.customAnimation = keyframes.slice(0, MAX_CUSTOM_KEYFRAMES).map((k) => ({
@@ -135,6 +160,7 @@ class CharacterState {
     this.lastActiveAt = Date.now();
     this.moving = false;
     this.falling = false;
+    this.ridingMouse = false;
     this.customAnimation = null;
     if (state === 'sleep') {
       this._startSleeping();
@@ -201,14 +227,40 @@ class CharacterState {
     this.awakeSinceMs = Date.now();
   }
 
-  /** Advances physics one tick; returns a small descriptor {kind, frame, angles?} for the renderer. */
-  tick() {
+  /**
+   * Advances physics one tick; returns a small descriptor {kind, frame, angles?} for the renderer.
+   * mousePos (optional {x,y}, already converted to this character's local coordinate space by
+   * jsCharacterEngine.js) is only ever read while ridingMouse is active.
+   */
+  tick(mousePos) {
     if (Date.now() > this.sayUntil) this.speechText = null;
 
     if (this.beingDragged) {
       if (this.sleeping) this._wakeUp();
       this.customAnimation = null;
+      this.ridingMouse = false;
       return { kind: 'pinch', frame: this.frame };
+    }
+
+    if (this.ridingMouse) {
+      if (Date.now() > this.rideMouseUntil) {
+        this.ridingMouse = false;
+      } else {
+        if (mousePos) {
+          // Weighted/heavy follow instead of snapping exactly onto the cursor - a slow lerp reads
+          // as being carried by something with real weight/inertia rather than glued to the tip.
+          const FOLLOW_RATE = 0.12;
+          this.lookRight = mousePos.x >= this.x;
+          this.x += (mousePos.x - this.x) * FOLLOW_RATE;
+          this.y = Math.min(this.floorY, this.y + (mousePos.y - this.y) * FOLLOW_RATE);
+        }
+        this.frameCounter++;
+        if (this.frameCounter >= WALK_FRAME_TICKS) {
+          this.frameCounter = 0;
+          this.frame++;
+        }
+        return { kind: 'pinch', frame: this.frame };
+      }
     }
 
     if (this.customAnimation) {

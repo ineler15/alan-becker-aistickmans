@@ -7,6 +7,13 @@ async function moveMouse(x, y) {
   await mouse.setPosition(new Point(Number(x), Number(y)));
 }
 
+// Absolute screen pixels, same coordinate space moveMouse/tap already use - lets ride_mouse
+// (characterState.js) actually follow the real cursor instead of the no-op it used to be.
+async function getMousePosition() {
+  const p = await mouse.getPosition();
+  return { x: p.x, y: p.y };
+}
+
 async function click(button = 'left') {
   const map = { left: Button.LEFT, right: Button.RIGHT, middle: Button.MIDDLE };
   await mouse.click(map[button] || Button.LEFT);
@@ -24,4 +31,4 @@ async function typeText(text) {
   await keyboard.type(String(text));
 }
 
-module.exports = { moveMouse, click, tap, typeText };
+module.exports = { moveMouse, click, tap, typeText, getMousePosition };

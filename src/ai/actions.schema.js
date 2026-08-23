@@ -33,9 +33,10 @@ const ACTIONS = [
   {
     name: 'ride_mouse',
     desc:
-      'El stickman se sube y viaja montado sobre el cursor del mouse del usuario durante unos segundos, ' +
-      'siguiendolo a donde se mueva.',
-    params: { seconds: 'number (opcional, default 6)' },
+      'El stickman se agarra y viaja montado sobre el cursor real del mouse durante unos segundos, ' +
+      'siguiendolo con peso (con algo de inercia, no pegado exacto a la punta) a donde se mueva. ' +
+      'No mueve el cursor, solo lo sigue - usalo cuando tenga sentido, es divertido.',
+    params: { seconds: 'number (opcional, default 6, maximo 20)' },
     risky: false,
   },
   {

@@ -27,8 +27,7 @@ function sendCommand(characterId, tool, args = {}) {
       state.startMoving(args.x, !!args.run);
       break;
     case 'ride_mouse':
-      // No mouse-riding physics in the JS engine yet - swallowed as a no-op instead of erroring
-      // the AI's action out; it just doesn't visibly do anything until this is implemented.
+      state.startRideMouse(args.seconds);
       break;
     case 'set_animation':
       state.setEmotion(args.state);

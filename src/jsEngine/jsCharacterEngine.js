@@ -16,6 +16,7 @@ const { pathToFileURL } = require('url');
 const { CharacterState, TICK_MS } = require('./characterState');
 const shimejiController = require('./jsShimejiController');
 const customCharacters = require('../customCharacters');
+const input = require('../actions/input');
 
 // Android's equivalent overlay window is a 128dp square (CharacterOverlay.kt's sizePx) - these
 // were never tuned to match and ended up much bigger on PC. Same aspect ratio as before, scaled
@@ -137,10 +138,19 @@ function start(characters) {
   tickTimer = setInterval(tick, TICK_MS);
 }
 
-function tick() {
+async function tick() {
+  // Only pay for the native getMousePosition() call when someone's actually riding it -
+  // characterState.js's ridingMouse/startRideMouse. Real (absolute) screen pixels, converted to
+  // each character's own workArea-local coordinate space below.
+  const anyRiding = entries.some((entry) => entry.state.ridingMouse);
+  const mousePos = anyRiding ? await input.getMousePosition().catch(() => null) : null;
+
   for (const entry of entries) {
     if (entry.win.isDestroyed()) continue;
-    const descriptor = entry.state.tick();
+    const localMousePos = mousePos
+      ? { x: mousePos.x - entry.workArea.x, y: mousePos.y - entry.workArea.y }
+      : null;
+    const descriptor = entry.state.tick(localMousePos);
     // While being dragged, the OS is already moving the window (see the 'move' listener above) -
     // repositioning it here too would fight the in-progress drag instead of just following it.
     if (!entry.state.beingDragged) {
