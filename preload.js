@@ -21,4 +21,7 @@ contextBridge.exposeInMainWorld('stickmanAPI', {
   getPalette: () => ipcRenderer.invoke('stickman:get-palette'),
   createCharacter: (data) => ipcRenderer.send('stickman:create-character', data),
   openCreateCharacterWindow: () => ipcRenderer.send('stickman:open-create-character-window'),
+  openEditCharacterWindow: (id) => ipcRenderer.send('stickman:open-edit-character-window', id),
+  getCustomCharacter: (id) => ipcRenderer.invoke('stickman:get-custom-character', id),
+  updateCharacter: (id, data) => ipcRenderer.send('stickman:update-character', { id, data }),
 });

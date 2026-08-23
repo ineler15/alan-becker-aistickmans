@@ -71,6 +71,17 @@ async function renderCharacterList(providers) {
     row.appendChild(charProviderSelect);
     row.appendChild(input);
     row.appendChild(partnerSelect);
+
+    // Only custom characters (see main.js's isCustom flag) have appearance fields worth editing -
+    // the vanilla/built-in ones don't get this button.
+    if (c.isCustom) {
+      const editBtn = document.createElement('button');
+      editBtn.textContent = 'Editar';
+      editBtn.type = 'button';
+      editBtn.addEventListener('click', () => window.stickmanAPI.openEditCharacterWindow(c.id));
+      row.appendChild(editBtn);
+    }
+
     charList.appendChild(row);
   }
 }

@@ -165,6 +165,12 @@ function hexToRgba(hex) {
 // base rig with a flag flipped.
 const templates = { normal: null, hollow: null };
 let selectedColor = null;
+const editId = new URLSearchParams(location.search).get('editId');
+
+function setRadioValue(name, value) {
+  const el = document.querySelector(`input[name="${name}"][value="${value}"]`);
+  if (el) el.checked = true;
+}
 
 function headModel() {
   return document.querySelector('input[name="head"]:checked').value;
@@ -211,8 +217,23 @@ async function init() {
     });
     swatchesEl.appendChild(swatch);
   }
-  selectedColor = palette[0];
-  swatchesEl.firstChild.classList.add('selected');
+
+  if (editId) {
+    const record = await window.stickmanAPI.getCustomCharacter(editId);
+    if (record) {
+      document.querySelector('h2').textContent = 'Editar stickman';
+      createBtn.textContent = 'Guardar cambios';
+      nameInput.value = record.displayName || '';
+      selectedColor = record.color;
+      setRadioValue('head', record.headModel || 'normal');
+      document.getElementById('hasFace').checked = !!record.hasFace;
+      setRadioValue('gender', record.gender || 'otro');
+      setRadioValue('accessory', record.accessory || 'none');
+    }
+  } else {
+    selectedColor = palette[0];
+    swatchesEl.firstChild.classList.add('selected');
+  }
   redraw();
 }
 
@@ -233,14 +254,16 @@ createBtn.addEventListener('click', () => {
     nameInput.focus();
     return;
   }
-  window.stickmanAPI.createCharacter({
+  const data = {
     displayName,
     color: selectedColor,
     headModel: headModel(),
     hasFace: hasFaceChecked(),
     gender: genderValue(),
     accessory: accessoryValue(),
-  });
+  };
+  if (editId) window.stickmanAPI.updateCharacter(editId, data);
+  else window.stickmanAPI.createCharacter(data);
   window.close();
 });
 

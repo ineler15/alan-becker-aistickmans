@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.ArrayAdapter
+import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -168,6 +169,23 @@ class MainActivity : AppCompatActivity() {
             row.addView(providerField)
             row.addView(apiKeyField)
             row.addView(partnerField)
+
+            // Only custom characters (see Prefs.customMeta) have appearance fields worth editing -
+            // the vanilla/built-in ones (Red, TCO, etc.) don't get this button.
+            if (Prefs.customMeta(this, character.id) != null) {
+                val editButton = Button(this).apply {
+                    text = "Editar"
+                    setOnClickListener {
+                        startActivity(
+                            Intent(this@MainActivity, CreateCharacterActivity::class.java).apply {
+                                putExtra(CreateCharacterActivity.EXTRA_EDIT_ID, character.id)
+                            }
+                        )
+                    }
+                }
+                row.addView(editButton)
+            }
+
             binding.characterList.addView(row)
 
             checkBox.setOnCheckedChangeListener { _, isChecked ->

@@ -13,6 +13,8 @@
     <string name="grant_accessibility">Permitir que toquen la pantalla</string>
     <string name="group_chat">Hablarle a todos (chat grupal)</string>
     <string name="create_character">Crear mi stickman</string>
+    <string name="edit_character">Editar stickman</string>
+    <string name="edit_character_submit">Guardar cambios</string>
     <string name="create_character_name_hint">Como se va a llamar</string>
     <string name="create_character_color">Color</string>
     <string name="create_character_color_advanced">Elegir cualquier color (rojo/verde/azul)</string>

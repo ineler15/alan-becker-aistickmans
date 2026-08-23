@@ -142,6 +142,58 @@ object Prefs {
         return def
     }
 
+    data class CustomCharacterRecord(
+        val displayName: String,
+        val headModel: String,
+        val hasFace: Boolean,
+        val gender: String,
+        val accessory: String,
+    )
+
+    /** Raw stored fields for one custom character - used to prefill "editar personaje". Null for a built-in or unknown id. */
+    fun getCustomCharacterRecord(context: Context, characterId: String): CustomCharacterRecord? {
+        val array = JSONArray(sp(context).getString("custom_characters", "[]") ?: "[]")
+        for (i in 0 until array.length()) {
+            val obj = array.getJSONObject(i)
+            if (obj.getString("id") == characterId) {
+                return CustomCharacterRecord(
+                    displayName = obj.optString("displayName", characterId),
+                    headModel = obj.optString("headModel", "normal"),
+                    hasFace = obj.optBoolean("hasFace", false),
+                    gender = obj.optString("gender", "otro"),
+                    accessory = obj.optString("accessory", "none"),
+                )
+            }
+        }
+        return null
+    }
+
+    // The id itself never changes (renaming would orphan memory_<id>/personality_<id> prefs keys) -
+    // only display name and appearance can, mirroring PC's customCharacters.js update().
+    fun updateCustomCharacter(
+        context: Context,
+        characterId: String,
+        displayName: String,
+        headModel: String,
+        hasFace: Boolean,
+        gender: String,
+        accessory: String,
+    ) {
+        val array = JSONArray(sp(context).getString("custom_characters", "[]") ?: "[]")
+        for (i in 0 until array.length()) {
+            val obj = array.getJSONObject(i)
+            if (obj.getString("id") == characterId) {
+                obj.put("displayName", displayName.ifBlank { obj.optString("displayName", characterId) })
+                obj.put("headModel", headModel)
+                obj.put("hasFace", hasFace)
+                obj.put("gender", gender)
+                obj.put("accessory", if (accessory == "hair" || accessory == "bow") accessory else "none")
+                break
+            }
+        }
+        sp(context).edit().putString("custom_characters", array.toString()).apply()
+    }
+
     /** poseProfile is PoseLibrary's PROFILE_BY_ID key (built-ins don't need one - the caller keeps using its own id). */
     data class CustomCharacterMeta(val poseProfile: String, val hasFace: Boolean, val gender: String, val accessory: String)
 

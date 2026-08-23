@@ -20,17 +20,28 @@ import com.stickmanai.android.overlay.RigView
  */
 class CreateCharacterActivity : AppCompatActivity() {
 
+    companion object {
+        // Set means the same Activity is reused to edit an existing custom character instead of
+        // creating a new one - see MainActivity.kt's Editar button. The id itself never changes
+        // (see Prefs.updateCustomCharacter's comment), only display name and appearance can.
+        const val EXTRA_EDIT_ID = "editId"
+    }
+
     private lateinit var binding: ActivityCreateCharacterBinding
     private var selectedColor: IntArray = Palette.COLORS[0]
     private var previewView: RigView? = null
+    private var editId: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityCreateCharacterBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        editId = intent.getStringExtra(EXTRA_EDIT_ID)
+
         buildSwatches()
         setupColorSliders()
+        prefillForEdit()
         binding.headGroup.setOnCheckedChangeListener { _, _ -> updatePreview() }
         binding.checkHasFace.setOnCheckedChangeListener { _, _ -> updatePreview() }
         binding.genderGroup.setOnCheckedChangeListener { _, _ -> updatePreview() }
@@ -44,10 +55,44 @@ class CreateCharacterActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
             val headModel = if (isHollow()) "hollow" else "normal"
-            val def = Prefs.addCustomCharacter(this, name, headModel, binding.checkHasFace.isChecked, genderValue(), accessoryValue())
-            val rig = RigTemplate.build(this, selectedColor, isHollow())
-            RigTemplate.save(this, def.id, rig)
+            val id = editId
+            if (id != null) {
+                Prefs.updateCustomCharacter(this, id, name, headModel, binding.checkHasFace.isChecked, genderValue(), accessoryValue())
+                val rig = RigTemplate.build(this, selectedColor, isHollow())
+                RigTemplate.save(this, id, rig)
+            } else {
+                val def = Prefs.addCustomCharacter(this, name, headModel, binding.checkHasFace.isChecked, genderValue(), accessoryValue())
+                val rig = RigTemplate.build(this, selectedColor, isHollow())
+                RigTemplate.save(this, def.id, rig)
+            }
             finish()
+        }
+    }
+
+    private fun prefillForEdit() {
+        val id = editId ?: return
+        val record = Prefs.getCustomCharacterRecord(this, id) ?: return
+        binding.titleText.text = getString(R.string.edit_character)
+        binding.btnCreate.text = getString(R.string.edit_character_submit)
+        binding.editName.setText(record.displayName)
+        binding.radioHollow.isChecked = record.headModel == "hollow"
+        binding.radioNormal.isChecked = record.headModel != "hollow"
+        binding.checkHasFace.isChecked = record.hasFace
+        when (record.gender) {
+            "masculino" -> binding.radioMasculino.isChecked = true
+            "femenino" -> binding.radioFemenino.isChecked = true
+            else -> binding.radioOtroGenero.isChecked = true
+        }
+        when (record.accessory) {
+            "hair" -> binding.radioAccessoryHair.isChecked = true
+            "bow" -> binding.radioAccessoryBow.isChecked = true
+            else -> binding.radioAccessoryNone.isChecked = true
+        }
+        val savedRig = RigTemplate.load(this, id)
+        val colorArray = savedRig?.optJSONArray("color")
+        if (colorArray != null && colorArray.length() >= 4) {
+            selectedColor = intArrayOf(colorArray.getInt(0), colorArray.getInt(1), colorArray.getInt(2), colorArray.getInt(3))
+            syncSlidersToSelectedColor()
         }
     }
 

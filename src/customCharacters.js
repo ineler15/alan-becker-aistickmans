@@ -111,6 +111,40 @@ function create({ displayName, color, headModel, hasFace, gender, accessory }) {
   return record;
 }
 
+// Raw stored record (not the pose-resolved metaFor() shape) - used to prefill the "editar
+// personaje" form with whatever this custom character was created with. Null for a built-in or
+// unknown id, same as metaFor().
+function getRecord(id) {
+  return load().find((c) => c.id === id) || null;
+}
+
+// Only ever called for an id already in custom_characters.json (see getRecord/isCustom above) -
+// the id itself never changes (renaming would orphan personality-<id>.json/history-<id>.json/etc,
+// see sanitizeId's case-collision comment), only its display name and appearance can.
+function update(id, { displayName, color, headModel, hasFace, gender, accessory }) {
+  const list = load();
+  const record = list.find((c) => c.id === id);
+  if (!record) return null;
+
+  record.displayName = (displayName || '').trim() || record.displayName;
+  record.color = color || record.color;
+  record.headModel = headModel || record.headModel;
+  record.hasFace = !!hasFace;
+  record.gender = gender || 'otro';
+  record.accessory = ['hair', 'bow'].includes(accessory) ? accessory : 'none';
+  save(list);
+
+  const rig = buildRig(record.color, record.headModel);
+  fs.writeFileSync(path.join(CUSTOM_RIGS_DIR, `${id}.json`), JSON.stringify(rig));
+
+  const rosterEntry = CHARACTERS.ALL.find((c) => c.id === id);
+  if (rosterEntry) {
+    rosterEntry.displayName = record.displayName;
+    rosterEntry.gender = record.gender;
+  }
+  return record;
+}
+
 function customRigPath(id) {
   const p = path.join(CUSTOM_RIGS_DIR, `${id}.json`);
   return fs.existsSync(p) ? p : null;
@@ -134,6 +168,8 @@ module.exports = {
   PALETTE,
   loadIntoRoster,
   create,
+  update,
+  getRecord,
   customRigPath,
   metaFor,
 };

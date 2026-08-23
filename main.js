@@ -153,7 +153,9 @@ function createSettingsWindow() {
 // disturbing whatever the user already has entered in the settings form.
 let createCharacterWindow = null;
 
-function openCreateCharacterWindow() {
+// editId set means the same window/page is reused to edit an existing custom character instead of
+// creating a new one - see createCharacter.js's init(), which reads ?editId= to switch modes.
+function openCreateCharacterWindow(editId) {
   if (createCharacterWindow) {
     bringToFront(createCharacterWindow);
     return;
@@ -161,7 +163,7 @@ function openCreateCharacterWindow() {
   createCharacterWindow = new BrowserWindow({
     width: 420,
     height: 420,
-    title: 'Crear tu propio stickman',
+    title: editId ? 'Editar stickman' : 'Crear tu propio stickman',
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -169,7 +171,9 @@ function openCreateCharacterWindow() {
       nodeIntegration: false,
     },
   });
-  createCharacterWindow.loadFile(path.join(__dirname, 'renderer', 'createCharacter.html'));
+  createCharacterWindow.loadFile(path.join(__dirname, 'renderer', 'createCharacter.html'), {
+    query: editId ? { editId } : {},
+  });
   createCharacterWindow.once('ready-to-show', () => bringToFront(createCharacterWindow));
   createCharacterWindow.on('closed', () => {
     createCharacterWindow = null;
@@ -267,7 +271,13 @@ app.whenReady().then(() => {
 
   ipcMain.handle('stickman:get-settings', () => ({
     providers: pcSettings.PROVIDERS,
-    characters: CHARACTERS.ALL.map((c) => ({ id: c.id, displayName: c.displayName })),
+    characters: CHARACTERS.ALL.map((c) => ({
+      id: c.id,
+      displayName: c.displayName,
+      // Only custom characters (see customCharacters.js) have appearance fields to edit - the
+      // vanilla/built-in ones (Red, TCO, etc.) don't get an "Editar" button in settings.js.
+      isCustom: !!customCharacters.metaFor(c.id),
+    })),
     settings: pcSettings.load(),
   }));
 
@@ -285,7 +295,13 @@ app.whenReady().then(() => {
     openCreateCharacterWindow();
   });
 
+  ipcMain.on('stickman:open-edit-character-window', (_event, id) => {
+    openCreateCharacterWindow(id);
+  });
+
   ipcMain.handle('stickman:get-palette', () => customCharacters.PALETTE);
+
+  ipcMain.handle('stickman:get-custom-character', (_event, id) => customCharacters.getRecord(id));
 
   ipcMain.on('stickman:create-character', (_event, data) => {
     customCharacters.create(data);
@@ -294,6 +310,17 @@ app.whenReady().then(() => {
     // the user created a character mid pre-launch-setup) and the tray's "Hablar con" list. The
     // new character isn't enabled by default (same as any other unchecked one in settings), so
     // this doesn't spin up a visible window for it until the user ticks its checkbox and saves.
+    if (settingsWindow) settingsWindow.webContents.send('stickman:characters-updated');
+    if (tray) tray.setContextMenu(buildTrayMenu());
+  });
+
+  ipcMain.on('stickman:update-character', (_event, { id, data }) => {
+    customCharacters.update(id, data);
+    if (createCharacterWindow) createCharacterWindow.close();
+    // The running character engine (if this character is currently enabled) still has the OLD
+    // rig/appearance loaded in its window - same "takes effect after the next
+    // Configuracion save/restart" tradeoff as every other settings.js change, not worth a special
+    // case just for this.
     if (settingsWindow) settingsWindow.webContents.send('stickman:characters-updated');
     if (tray) tray.setContextMenu(buildTrayMenu());
   });

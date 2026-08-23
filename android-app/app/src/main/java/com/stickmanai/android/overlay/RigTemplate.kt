@@ -36,4 +36,11 @@ object RigTemplate {
         file.writeText(rig.toString())
         return file
     }
+
+    /** Reads back a previously-saved custom rig, e.g. to recover its color for "editar personaje". */
+    fun load(context: Context, id: String): JSONObject? {
+        val file = File(File(context.filesDir, "custom_rigs"), "$id.json")
+        if (!file.exists()) return null
+        return JSONObject(file.readText())
+    }
 }
