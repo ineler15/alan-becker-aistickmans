@@ -8,6 +8,7 @@ import android.os.Build
 import android.util.Base64
 import android.view.Display
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityWindowInfo
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.io.ByteArrayOutputStream
@@ -21,9 +22,12 @@ import kotlin.coroutines.resume
  * enable this manually under Settings > Accessibility (see MainActivity's grant button); until
  * then both are simply no-ops, same fallback style as CameraCapture without camera permission.
  *
- * canRetrieveWindowContent is intentionally left off in tap_accessibility_service.xml - this
- * service can see rendered pixels (takeScreenshot) but never reads the UI hierarchy/text content
- * of other apps, which is what that flag would additionally unlock.
+ * canRetrieveWindowContent + flagRetrieveInteractiveWindows are on in tap_accessibility_service.xml
+ * so isKeyboardVisible() below can see the system's window LIST (type/bounds of each top-level
+ * window, including the IME) - this service still never calls a node-content API
+ * (findAccessibilityNodeInfosByText, getRootInActiveWindow, etc.), so it never reads the actual
+ * UI hierarchy or text of other apps, only pixels (takeScreenshot), where to tap, and whether a
+ * keyboard window is present.
  */
 class TapAccessibilityService : AccessibilityService() {
 
@@ -33,6 +37,18 @@ class TapAccessibilityService : AccessibilityService() {
         private const val JPEG_QUALITY = 65
 
         val isEnabled: Boolean get() = instance != null
+
+        /**
+         * True if the on-screen keyboard is currently up, in ANY app - not just this one.
+         * Checks the system's window list for one of type TYPE_INPUT_METHOD instead of the old
+         * getWindowVisibleDisplayFrame() trick (see CharacterOverlay's git history), which only
+         * ever reflected this app's own windows and got stuck once the character view it measured
+         * from was hidden. False (never hides the character) if the service isn't enabled.
+         */
+        fun isKeyboardVisible(): Boolean {
+            val service = instance ?: return false
+            return service.windows?.any { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD } ?: false
+        }
 
         /** Taps at the given screen coordinates. No-op (returns false) if the service isn't enabled. */
         fun tapAt(x: Float, y: Float): Boolean {

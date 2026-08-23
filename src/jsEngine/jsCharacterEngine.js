@@ -11,8 +11,11 @@
 
 const { BrowserWindow, screen } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const { pathToFileURL } = require('url');
 const { CharacterState, TICK_MS } = require('./characterState');
 const shimejiController = require('./jsShimejiController');
+const customCharacters = require('../customCharacters');
 
 // Android's equivalent overlay window is a 128dp square (CharacterOverlay.kt's sizePx) - these
 // were never tuned to match and ended up much bigger on PC. Same aspect ratio as before, scaled
@@ -61,9 +64,17 @@ function createWindow(character, startX, startY, size) {
       nodeIntegration: true,
     },
   });
-  win.loadFile(path.join(__dirname, '..', '..', 'renderer', 'character.html'), {
-    query: { id: character.id, rw: String(size.rigWidth), rh: String(size.rigHeight) },
-  });
+  const builtinRigPath = path.join(__dirname, '..', '..', 'renderer', 'rigs', `${character.id}.json`);
+  const query = { id: character.id, rw: String(size.rigWidth), rh: String(size.rigHeight) };
+  // Custom characters' rigs live in the writable workspace dir (see customCharacters.js), not
+  // under renderer/rigs/ - that tree can end up read-only inside app.asar in a packaged build.
+  if (!fs.existsSync(builtinRigPath)) {
+    const rigPath = customCharacters.customRigPath(character.id);
+    // Windows paths (backslashes, drive letters) aren't valid file:// URLs as-is - build the
+    // proper URL here in the main process rather than string-concatenating in the renderer.
+    if (rigPath) query.customRigUrl = pathToFileURL(rigPath).href;
+  }
+  win.loadFile(path.join(__dirname, '..', '..', 'renderer', 'character.html'), { query });
   return win;
 }
 

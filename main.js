@@ -8,7 +8,12 @@ const webcam = require('./src/loop/webcam');
 const CHARACTERS = require('./src/characters');
 const peerServer = require('./src/net/peerServer');
 const pcSettings = require('./src/pcSettings');
+const customCharacters = require('./src/customCharacters');
 const jsCharacterEngine = require('./src/jsEngine/jsCharacterEngine');
+
+// Merge any custom characters saved in a previous session into CHARACTERS.ALL before the
+// settings window (and pcSettings.load()'s enabledIds default) ever reads it.
+customCharacters.loadIntoRoster();
 
 // Without this, launching the app while it's already running spins up a second full set of
 // electron.exe processes and character windows, fighting over the same hotkeys/webcam - the
@@ -143,6 +148,34 @@ function createSettingsWindow() {
   });
 }
 
+// Dedicated window for "crear tu propio stickman" - separate from settingsWindow so it can be
+// opened both pre-launch (from a button in settings.html) and later from the tray, without
+// disturbing whatever the user already has entered in the settings form.
+let createCharacterWindow = null;
+
+function openCreateCharacterWindow() {
+  if (createCharacterWindow) {
+    bringToFront(createCharacterWindow);
+    return;
+  }
+  createCharacterWindow = new BrowserWindow({
+    width: 420,
+    height: 420,
+    title: 'Crear tu propio stickman',
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  createCharacterWindow.loadFile(path.join(__dirname, 'renderer', 'createCharacter.html'));
+  createCharacterWindow.once('ready-to-show', () => bringToFront(createCharacterWindow));
+  createCharacterWindow.on('closed', () => {
+    createCharacterWindow = null;
+  });
+}
+
 function buildTrayMenu() {
   return Menu.buildFromTemplate([
     {
@@ -156,6 +189,11 @@ function buildTrayMenu() {
       label: `Hablar con ${c.displayName}`,
       click: () => openChatWindow(c.id),
     })),
+    { type: 'separator' },
+    {
+      label: 'Crear un stickman nuevo',
+      click: () => openCreateCharacterWindow(),
+    },
     {
       label: 'Abrir carpeta workspace',
       click: () => shell.openPath(config.workspaceDir),
@@ -240,6 +278,23 @@ app.whenReady().then(() => {
     if (settingsWindow) settingsWindow.close();
     startCharacterEngine();
     agentLoop.start();
+  });
+
+  ipcMain.on('stickman:open-create-character-window', () => {
+    openCreateCharacterWindow();
+  });
+
+  ipcMain.handle('stickman:get-palette', () => customCharacters.PALETTE);
+
+  ipcMain.on('stickman:create-character', (_event, data) => {
+    customCharacters.create(data);
+    if (createCharacterWindow) createCharacterWindow.close();
+    // Reflect the new character in whatever's already open/running - the settings window (if
+    // the user created a character mid pre-launch-setup) and the tray's "Hablar con" list. The
+    // new character isn't enabled by default (same as any other unchecked one in settings), so
+    // this doesn't spin up a visible window for it until the user ticks its checkbox and saves.
+    if (settingsWindow) settingsWindow.webContents.send('stickman:characters-updated');
+    if (tray) tray.setContextMenu(buildTrayMenu());
   });
 
   createSettingsWindow();

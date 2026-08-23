@@ -2,6 +2,7 @@ package com.stickmanai.android.overlay
 
 import android.content.Context
 import android.graphics.Color
+import java.io.File
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -34,18 +35,32 @@ class RigFigure(val bodyColor: Int, val root: RigNode) {
     companion object {
         private val cache = HashMap<String, RigFigure>()
 
-        /** Null if there's no rigs/<characterId>.json asset - callers fall back to sprites. */
+        /** Null if there's no built-in or custom rig for this id - callers fall back to sprites. */
         fun forCharacterOrNull(context: Context, characterId: String): RigFigure? {
             cache[characterId]?.let { return it }
-            val json = try {
-                context.assets.open("rigs/$characterId.json").use { it.reader().readText() }
-            } catch (e: Exception) {
-                return null
-            }
-            val obj = JSONObject(json)
-            val figure = RigFigure(colorFrom(obj.getJSONArray("color")), parseNode(obj.getJSONObject("root")))
+            val json = readRigJson(context, characterId) ?: return null
+            val figure = fromJson(JSONObject(json))
             cache[characterId] = figure
             return figure
+        }
+
+        // Exposed (not just used internally by forCharacterOrNull) so CreateCharacterActivity
+        // can render a live preview straight from an in-memory rig JSONObject - e.g. one just
+        // built by RigTemplate - without writing it to filesDir/reading it back first.
+        fun fromJson(obj: JSONObject): RigFigure =
+            RigFigure(colorFrom(obj.getJSONArray("color")), parseNode(obj.getJSONObject("root")))
+
+        // Built-in rigs ship as bundled assets; custom ones (from CreateCharacterActivity) are
+        // written to filesDir at creation time since assets/ is read-only at runtime - see
+        // RigTemplate.kt.
+        private fun readRigJson(context: Context, characterId: String): String? {
+            try {
+                return context.assets.open("rigs/$characterId.json").use { it.reader().readText() }
+            } catch (e: Exception) {
+                // Not a built-in - fall through to check for a custom rig below.
+            }
+            val customFile = File(context.filesDir, "custom_rigs/$characterId.json")
+            return if (customFile.exists()) customFile.readText() else null
         }
 
         private fun colorFrom(arr: JSONArray): Int =

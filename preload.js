@@ -15,4 +15,10 @@ contextBridge.exposeInMainWorld('stickmanAPI', {
   },
   getPcSettings: () => ipcRenderer.invoke('stickman:get-settings'),
   savePcSettings: (settings) => ipcRenderer.send('stickman:save-settings', settings),
+  onCharactersUpdated: (callback) => {
+    ipcRenderer.on('stickman:characters-updated', () => callback());
+  },
+  getPalette: () => ipcRenderer.invoke('stickman:get-palette'),
+  createCharacter: (data) => ipcRenderer.send('stickman:create-character', data),
+  openCreateCharacterWindow: () => ipcRenderer.send('stickman:open-create-character-window'),
 });

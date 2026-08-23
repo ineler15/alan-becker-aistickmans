@@ -1,0 +1,116 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Crear tu propio stickman</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: #1e1e1e;
+        color: #eee;
+        padding: 16px;
+        box-sizing: border-box;
+      }
+      h2 {
+        margin-top: 0;
+        font-size: 16px;
+      }
+      label {
+        display: block;
+        font-size: 12px;
+        color: #aaa;
+        margin-top: 10px;
+      }
+      input[type='text'] {
+        width: 100%;
+        box-sizing: border-box;
+        background: #2a2a2a;
+        color: #eee;
+        border: 1px solid #444;
+        border-radius: 6px;
+        padding: 6px;
+        font-size: 13px;
+        font-family: inherit;
+        margin-top: 2px;
+      }
+      .row {
+        display: flex;
+        gap: 16px;
+      }
+      .col {
+        flex: 1;
+      }
+      #swatches {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 4px;
+      }
+      .swatch {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 2px solid transparent;
+        cursor: pointer;
+      }
+      .swatch.selected {
+        border-color: #3b82f6;
+      }
+      .head-options {
+        display: flex;
+        gap: 12px;
+        margin-top: 4px;
+      }
+      .head-options label {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 0;
+        color: #eee;
+        font-size: 13px;
+      }
+      #preview {
+        display: block;
+        margin: 8px auto 0;
+        background: #111;
+        border-radius: 8px;
+      }
+      button {
+        margin-top: 16px;
+        width: 100%;
+        padding: 10px;
+        background: #3b82f6;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      button:hover {
+        background: #2563eb;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Crear tu propio stickman</h2>
+    <label>Nombre</label>
+    <input id="name" type="text" placeholder="Como se va a llamar" autofocus />
+    <div class="row">
+      <div class="col">
+        <label>Color</label>
+        <div id="swatches"></div>
+        <label>Modelo de cabeza</label>
+        <div class="head-options">
+          <label><input type="radio" name="head" value="normal" checked /> Normal</label>
+          <label><input type="radio" name="head" value="hollow" /> Hueca</label>
+        </div>
+      </div>
+      <div class="col">
+        <canvas id="preview" width="140" height="180"></canvas>
+      </div>
+    </div>
+    <button id="createBtn">Crear stickman</button>
+    <script src="createCharacter.js"></script>
+  </body>
+</html>

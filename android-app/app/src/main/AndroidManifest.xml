@@ -32,6 +32,10 @@
             android:theme="@style/Theme.StickmanAI.Dialog"
             android:excludeFromRecents="true" />
 
+        <activity
+            android:name=".CreateCharacterActivity"
+            android:exported="false" />
+
         <service
             android:name=".overlay.OverlayService"
             android:exported="false"

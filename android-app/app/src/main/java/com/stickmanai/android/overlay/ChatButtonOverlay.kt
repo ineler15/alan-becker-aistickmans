@@ -123,7 +123,7 @@ class ChatButtonOverlay(private val context: Context, private val windowManager:
     private fun send() {
         val text = editText.text.toString().trim()
         if (text.isNotEmpty()) {
-            PendingMessages.setAll(text)
+            PendingMessages.setAll(context, text)
             editText.setText("")
         }
         hidePanel()

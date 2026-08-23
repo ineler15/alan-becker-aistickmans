@@ -1,21 +1,17 @@
-async function init() {
-  const { providers, characters, settings } = await window.stickmanAPI.getPcSettings();
+// Rebuilding charList wipes any not-yet-saved edits in it, but that only happens when a
+// characters-updated push arrives (i.e. the user just created a character from this same
+// window) - an acceptable tradeoff for keeping this simple.
+let keyInputs = {};
+let providerSelects = {};
+let checkboxes = {};
 
-  const providerSelect = document.getElementById('provider');
-  for (const p of providers) {
-    const opt = document.createElement('option');
-    opt.value = p;
-    opt.textContent = p;
-    if (p === settings.provider) opt.selected = true;
-    providerSelect.appendChild(opt);
-  }
-
-  document.getElementById('sharedKey').value = settings.sharedApiKey || '';
-
+async function renderCharacterList(providers) {
+  const { characters, settings } = await window.stickmanAPI.getPcSettings();
   const charList = document.getElementById('charList');
-  const keyInputs = {};
-  const providerSelects = {};
-  const checkboxes = {};
+  charList.innerHTML = '';
+  keyInputs = {};
+  providerSelects = {};
+  checkboxes = {};
   const enabledIds = new Set(settings.enabledIds || []);
   const perCharacterProvider = settings.perCharacterProvider || {};
   for (const c of characters) {
@@ -57,6 +53,29 @@ async function init() {
     row.appendChild(input);
     charList.appendChild(row);
   }
+}
+
+async function init() {
+  const { providers, settings } = await window.stickmanAPI.getPcSettings();
+
+  const providerSelect = document.getElementById('provider');
+  for (const p of providers) {
+    const opt = document.createElement('option');
+    opt.value = p;
+    opt.textContent = p;
+    if (p === settings.provider) opt.selected = true;
+    providerSelect.appendChild(opt);
+  }
+
+  document.getElementById('sharedKey').value = settings.sharedApiKey || '';
+
+  await renderCharacterList(providers);
+
+  window.stickmanAPI.onCharactersUpdated(() => renderCharacterList(providers));
+
+  document.getElementById('createCharacterBtn').addEventListener('click', () => {
+    window.stickmanAPI.openCreateCharacterWindow();
+  });
 
   document.getElementById('continueBtn').addEventListener('click', () => {
     const perCharacterKeys = {};

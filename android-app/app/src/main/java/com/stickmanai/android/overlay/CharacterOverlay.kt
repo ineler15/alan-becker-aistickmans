@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
-import android.graphics.Rect
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -12,6 +11,7 @@ import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.TextView
 import com.stickmanai.android.CharacterDef
+import com.stickmanai.android.input.TapAccessibilityService
 
 /**
  * One character's pair of overlay windows (the sprite itself + its speech bubble), plus the
@@ -44,15 +44,7 @@ class CharacterOverlay(
     private val density = context.resources.displayMetrics.density
     val sizePx = (128 * density).toInt()
     private val floorY = screenHeightPx - (48 * density).toInt()
-    private val screenHeight = screenHeightPx
     val state = CharacterState(screenWidthPx, screenHeightPx, floorY)
-
-    // Overlay windows don't get resized by the keyboard the way an app window would, so the
-    // character would otherwise keep resting at its usual floor position UNDER the keyboard -
-    // both covering it and (since the character's hitbox eats touches) blocking taps on it.
-    // getWindowVisibleDisplayFrame() still reports the keyboard cutting into this window's
-    // visible area, so that's used to detect it and lift the character above it visually.
-    private var keyboardInsetPx = 0
 
     val recentHistory = ArrayDeque<String>()
     var lastSayText: String? = null
@@ -94,21 +86,6 @@ class CharacterOverlay(
         windowManager.addView(characterView, imageParams)
         windowManager.addView(speechView, speechParams)
         render()
-    }
-
-    // Recomputed every tick() instead of only from a one-off OnGlobalLayoutListener - that
-    // listener reliably fires when the keyboard opens (its layout pass genuinely changes this
-    // small overlay window's visible frame), but often does NOT fire again once the keyboard
-    // closes, since nothing forces another layout pass for this particular window at that point.
-    // That left keyboardInsetPx stuck > 0 forever, hiding the character until the app restarted -
-    // recomputing on every tick self-corrects regardless of whether a layout event ever comes.
-    private fun updateKeyboardInset() {
-        val rect = Rect()
-        characterView.getWindowVisibleDisplayFrame(rect)
-        val covered = screenHeight - rect.bottom
-        // Small covered slivers are just status/nav bar chrome, not a keyboard - require a
-        // sizeable chunk before treating it as one.
-        keyboardInsetPx = if (covered > screenHeight * 0.15) covered else 0
     }
 
     fun detach() {
@@ -184,14 +161,14 @@ class CharacterOverlay(
         if (isEmpty()) sprites!!.stand else this[i % size]
 
     private fun render() {
-        updateKeyboardInset()
         // Just lifting the character above the keyboard still parks it right at the keyboard's
         // top edge - exactly where a text field being typed into usually sits, so it kept
         // covering the very thing the user was writing in. Hiding it outright while the
         // keyboard is up is the only way to guarantee it's never "in the way" of typing; the
         // underlying physics (state.x/state.y) keeps running so it resumes normally once the
-        // keyboard closes.
-        if (keyboardInsetPx > 0) {
+        // keyboard closes. isKeyboardVisible() is recomputed every tick (cheap: one IPC-free
+        // list scan) and works in ANY foreground app, not just this one - see TapAccessibilityService.
+        if (TapAccessibilityService.isKeyboardVisible()) {
             characterView.visibility = View.GONE
             speechView.visibility = View.GONE
             return

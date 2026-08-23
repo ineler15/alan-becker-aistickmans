@@ -2,7 +2,7 @@ package com.stickmanai.android.chat
 
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
-import com.stickmanai.android.CHARACTERS
+import com.stickmanai.android.allCharacters
 import com.stickmanai.android.databinding.ActivityChatBinding
 import com.stickmanai.android.overlay.PendingMessages
 
@@ -30,13 +30,13 @@ class ChatActivity : AppCompatActivity() {
         binding.chatTitle.text = if (isGroup) {
             "Hablarle a todos"
         } else {
-            "Hablar con ${CHARACTERS.find { it.id == characterId }?.displayName ?: characterId}"
+            "Hablar con ${allCharacters(this).find { it.id == characterId }?.displayName ?: characterId}"
         }
 
         binding.btnSend.setOnClickListener {
             val text = binding.editMessage.text.toString().trim()
             if (text.isNotEmpty()) {
-                if (isGroup) PendingMessages.setAll(text) else PendingMessages.set(characterId, text)
+                if (isGroup) PendingMessages.setAll(this, text) else PendingMessages.set(characterId, text)
                 finish()
             }
         }

@@ -7,7 +7,15 @@
     <string name="send">Enviar</string>
     <string name="message_hint">Escribile algo…</string>
     <string name="pc_address_hint">IP:puerto de la PC (ej: 192.168.18.27:8787)</string>
-    <string name="tap_accessibility_description">Le permite a tus personajes tocar la pantalla por vos (accion "tap"), como si fueran un dedo, y ver una captura de lo que hay en pantalla para poder comentarlo (se manda a la IA junto con tu posicion). No lee texto ni el contenido interno de otras apps, solo la imagen de la pantalla y donde tocar.</string>
+    <string name="tap_accessibility_description">Le permite a tus personajes tocar la pantalla por vos (accion "tap"), como si fueran un dedo, y ver una captura de lo que hay en pantalla para poder comentarlo (se manda a la IA junto con tu posicion). Tambien chequea si el teclado esta abierto en cualquier app para esconderse y no taparlo. No lee texto ni el contenido interno de otras apps, solo la imagen de la pantalla, donde tocar y si hay un teclado en pantalla.</string>
     <string name="grant_accessibility">Permitir que toquen la pantalla</string>
     <string name="group_chat">Hablarle a todos (chat grupal)</string>
+    <string name="create_character">Crear mi stickman</string>
+    <string name="create_character_name_hint">Como se va a llamar</string>
+    <string name="create_character_color">Color</string>
+    <string name="create_character_head">Modelo de cabeza</string>
+    <string name="create_character_head_normal">Normal</string>
+    <string name="create_character_head_hollow">Hueca</string>
+    <string name="create_character_submit">Crear stickman</string>
+    <string name="create_character_name_required">Poné un nombre primero</string>
 </resources>

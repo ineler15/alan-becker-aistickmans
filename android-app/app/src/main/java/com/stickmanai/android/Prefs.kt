@@ -1,6 +1,7 @@
 package com.stickmanai.android
 
 import android.content.Context
+import org.json.JSONArray
 
 /** Simple SharedPreferences wrapper - which characters are enabled and their API keys/personality/memory. */
 object Prefs {
@@ -79,7 +80,41 @@ object Prefs {
     }
 
     fun enabledCharacters(context: Context): List<CharacterDef> =
-        CHARACTERS.filter { isEnabled(context, it.id) }
+        allCharacters(context).filter { isEnabled(context, it.id) }
+
+    // Characters created at runtime via "crear tu propio stickman" - stored as a JSON array
+    // since CHARACTERS_BUILTIN is a compile-time list and can't be appended to directly.
+    fun customCharacters(context: Context): List<CharacterDef> {
+        val raw = sp(context).getString("custom_characters", "[]") ?: "[]"
+        val array = JSONArray(raw)
+        return (0 until array.length()).map { i ->
+            val obj = array.getJSONObject(i)
+            CharacterDef(obj.getString("id"), obj.getString("displayName"))
+        }
+    }
+
+    // Sanitizes displayName into an id (letters/digits only, deduped against every existing
+    // builtin + custom id) and appends it - mirrors src/customCharacters.js's sanitizeId on PC.
+    fun addCustomCharacter(context: Context, displayName: String): CharacterDef {
+        val base = displayName.filter { it.isLetterOrDigit() }.ifBlank { "Stickman" }
+        val existingIds = allCharacters(context).map { it.id }.toSet()
+        var id = base
+        var suffix = 2
+        while (id in existingIds) {
+            id = "${base}_$suffix"
+            suffix += 1
+        }
+        val def = CharacterDef(id, displayName.ifBlank { "Stickman" })
+
+        val raw = sp(context).getString("custom_characters", "[]") ?: "[]"
+        val array = JSONArray(raw)
+        val entry = org.json.JSONObject()
+        entry.put("id", def.id)
+        entry.put("displayName", def.displayName)
+        array.put(entry)
+        sp(context).edit().putString("custom_characters", array.toString()).apply()
+        return def
+    }
 
     // "ip:puerto" of the desktop app's peer server (src/net/peerServer.js), so the tablet's
     // characters and the PC's characters can see each other - same LAN only, entered by hand

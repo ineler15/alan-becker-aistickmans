@@ -63,6 +63,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        binding.btnCreateCharacter.setOnClickListener {
+            startActivity(Intent(this, com.stickmanai.android.CreateCharacterActivity::class.java))
+        }
         binding.btnStart.setOnClickListener { startOverlayService() }
         binding.btnStop.setOnClickListener { stopService(Intent(this, OverlayService::class.java)) }
         binding.btnGroupChat.setOnClickListener {
@@ -91,6 +94,9 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         requestOverlayOrAccessibilityIfNeeded()
+        // Picks up any character just created in CreateCharacterActivity - buildCharacterRows()
+        // clears characterList first, so this doesn't duplicate rows on every resume.
+        buildCharacterRows()
     }
 
     // Each screen only auto-launches once per MainActivity lifetime (i.e. once per app open) -
@@ -119,7 +125,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun buildCharacterRows() {
-        for (character in CHARACTERS) {
+        binding.characterList.removeAllViews()
+        for (character in allCharacters(this)) {
             val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
 
             val checkBox = CheckBox(this).apply {

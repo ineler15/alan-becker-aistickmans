@@ -211,7 +211,11 @@ function resizeCanvas() {
 window.addEventListener('resize', resizeCanvas);
 
 async function main() {
-  const res = await fetch(`rigs/${characterId}.json`);
+  // Custom (user-created) characters store their rig outside renderer/rigs/, in the writable
+  // workspace dir - see jsCharacterEngine.js's createWindow(), which passes this query param
+  // only when there's no built-in renderer/rigs/<id>.json for this character.
+  const customRigUrl = params.get('customRigUrl');
+  const res = await fetch(customRigUrl || `rigs/${characterId}.json`);
   figure = await res.json();
   resizeCanvas();
 }
