@@ -34,7 +34,7 @@ function sendCommand(characterId, tool, args = {}) {
       state.setEmotion(args.state);
       break;
     case 'set_emotion':
-      state.setFaceEmotion(args.emotion);
+      state.setFace(args.eyes, args.mouth);
       break;
     case 'set_custom_animation':
       state.startCustomAnimation(Array.isArray(args.keyframes) ? args.keyframes : []);

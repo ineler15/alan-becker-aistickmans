@@ -27,9 +27,11 @@ const DEFAULT_KEYFRAME_HOLD_MS = 400;
 // Autonomous wander: if nothing (AI decision or drag) has moved this character in a while, walk
 // somewhere on its own instead of just idling in place.
 const IDLE_WALK_TIMEOUT_MS = 6000;
-// Same vocabulary as renderer/face.js's FaceRenderer.EMOTIONS - duplicated rather than shared
-// since this file runs in the main process (no `window`) and that one in the renderer.
-const FACE_EMOTIONS = ['neutral', 'happy', 'sad', 'angry', 'surprised', 'love'];
+// Same vocabulary as renderer/face.js's FaceRenderer - duplicated rather than shared since this
+// file runs in the main process (no `window`) and that one in the renderer. Independent axes (not
+// a bundled "emotion") so the AI can mix any eyes with any mouth.
+const EYE_STYLES = ['normal', 'wide', 'angry', 'heart'];
+const MOUTH_STYLES = ['neutral', 'smile', 'frown', 'open', 'angry'];
 
 class CharacterState {
   constructor(screenWidth, screenHeight, floorY) {
@@ -66,8 +68,10 @@ class CharacterState {
     // Facial expression only - fully independent of loopEmotion/customAnimation/moving/falling
     // (those are body pose), so a character can be e.g. walking and happy at the same time. Only
     // ever visible on a character built with hasFace (see customCharacters.js) - a no-op
-    // otherwise, same as this project's other "swallowed" actions.
-    this.faceEmotion = 'neutral';
+    // otherwise, same as this project's other "swallowed" actions. Eyes/mouth are independent
+    // axes rather than one bundled "emotion" so the AI can mix any pair.
+    this.eyeStyle = 'normal';
+    this.mouthStyle = 'neutral';
   }
 
   startMoving(targetX, run) {
@@ -105,21 +109,26 @@ class CharacterState {
     if (this.sleeping) this._wakeUp();
     this.customAnimation = keyframes.slice(0, MAX_CUSTOM_KEYFRAMES).map((k) => ({
       angles: k.angles || {},
-      face: FACE_EMOTIONS.includes(k.face) ? k.face : null,
+      eyes: EYE_STYLES.includes(k.eyes) ? k.eyes : null,
+      mouth: MOUTH_STYLES.includes(k.mouth) ? k.mouth : null,
       holdMs: Math.min(MAX_KEYFRAME_HOLD_MS, Math.max(MIN_KEYFRAME_HOLD_MS, k.holdMs || DEFAULT_KEYFRAME_HOLD_MS)),
     }));
     this.customIndex = 0;
     this.customKeyframeStartedAt = Date.now();
     this.customAccumulatedAngles = {};
-    // Keyframes that don't specify a face keep whatever the previous one set (or the character's
-    // standing faceEmotion if none in the sequence has set one yet) - only applying a keyframe's
-    // own face when it actually has one.
-    if (this.customAnimation[0].face) this.faceEmotion = this.customAnimation[0].face;
+    // Keyframes that don't specify eyes/mouth keep whatever the previous one set (or the
+    // character's standing eyeStyle/mouthStyle if none in the sequence has set one yet) - only
+    // applying a keyframe's own value when it actually has one.
+    if (this.customAnimation[0].eyes) this.eyeStyle = this.customAnimation[0].eyes;
+    if (this.customAnimation[0].mouth) this.mouthStyle = this.customAnimation[0].mouth;
   }
 
-  setFaceEmotion(emotion) {
+  // Either param can be omitted/invalid to leave that axis alone - e.g. setFace(undefined, 'smile')
+  // changes only the mouth, keeping whatever eyes were already set.
+  setFace(eyes, mouth) {
     this.lastActiveAt = Date.now();
-    this.faceEmotion = FACE_EMOTIONS.includes(emotion) ? emotion : 'neutral';
+    if (EYE_STYLES.includes(eyes)) this.eyeStyle = eyes;
+    if (MOUTH_STYLES.includes(mouth)) this.mouthStyle = mouth;
   }
 
   setEmotion(state) {
@@ -209,10 +218,11 @@ class CharacterState {
         Object.assign(this.customAccumulatedAngles, kf[this.customIndex].angles);
         this.customIndex++;
         this.customKeyframeStartedAt = Date.now();
-        // A keyframe without its own `face` keeps whatever the previous one set instead of
-        // resetting to neutral - only overwrite when this keyframe actually specifies one.
-        if (this.customIndex < kf.length && kf[this.customIndex].face) {
-          this.faceEmotion = kf[this.customIndex].face;
+        // A keyframe without its own eyes/mouth keeps whatever the previous one set instead of
+        // resetting to defaults - only overwrite the axis this keyframe actually specifies.
+        if (this.customIndex < kf.length) {
+          if (kf[this.customIndex].eyes) this.eyeStyle = kf[this.customIndex].eyes;
+          if (kf[this.customIndex].mouth) this.mouthStyle = kf[this.customIndex].mouth;
         }
       }
       if (this.customIndex >= kf.length) {

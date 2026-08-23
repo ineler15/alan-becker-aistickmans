@@ -143,7 +143,7 @@ function draw(ctx, canvas, figure, hasFaceOn, genderVal) {
   }
 
   if (headAnchor) {
-    if (hasFaceOn) window.FaceRenderer.drawFace(ctx, headAnchor.x, headAnchor.y, headAnchor.r, 'neutral');
+    if (hasFaceOn) window.FaceRenderer.drawFace(ctx, headAnchor.x, headAnchor.y, headAnchor.r, 'normal', 'neutral');
     window.FaceRenderer.drawGenderAccessory(ctx, headAnchor.x, headAnchor.y, headAnchor.r, genderVal);
   }
 }

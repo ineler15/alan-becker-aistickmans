@@ -221,8 +221,19 @@ class OverlayService : LifecycleService() {
                 screenBase64 = screenBase64,
             )
             val (tool, args) = dedupeRepeatedAction(characterId, decision.tool, decision.args)
+            // Captured from the ORIGINAL decision (before the repeat-guard above can swap
+            // tool/args out from under the model) - a pending face reaction shouldn't get
+            // silently dropped just because the body action it rode in on got overridden. See
+            // ActionsSchema.kt's EYES_PARAM/MOUTH_PARAM (every action accepts these two).
+            val requestedEyes = decision.args.optString("eyes").takeIf { it.isNotBlank() }
+            val requestedMouth = decision.args.optString("mouth").takeIf { it.isNotBlank() }
             turnsSinceSay[characterId] = if (tool == "say") 0 else silentStreak + 1
-            mainHandler.post { applyDecision(overlay, tool, args) }
+            mainHandler.post {
+                applyDecision(overlay, tool, args)
+                if (tool != "set_emotion" && (requestedEyes != null || requestedMouth != null)) {
+                    overlay.state.setFace(requestedEyes, requestedMouth)
+                }
+            }
             overlay.addHistory("${tool}(${args})")
         } catch (e: Exception) {
             android.util.Log.e("StickmanAI", "decide() failed for $characterId", e)
@@ -268,7 +279,10 @@ class OverlayService : LifecycleService() {
                 val validStates = setOf("happy", "trip", "sad", "scared", "sit", "tired", "sleep")
                 overlay.state.setEmotion(if (state in validStates) state else null)
             }
-            "set_emotion" -> overlay.state.setFaceEmotion(args.optString("emotion").takeIf { it.isNotBlank() })
+            "set_emotion" -> overlay.state.setFace(
+                args.optString("eyes").takeIf { it.isNotBlank() },
+                args.optString("mouth").takeIf { it.isNotBlank() },
+            )
             "say" -> {
                 val text = args.optString("text", "")
                 overlay.say(text)
@@ -286,7 +300,8 @@ class OverlayService : LifecycleService() {
                         CharacterState.Keyframe(
                             angles,
                             kf.optLong("holdMs", CharacterState.DEFAULT_KEYFRAME_HOLD_MS),
-                            face = if (kf.has("face")) kf.optString("face") else null,
+                            eyes = if (kf.has("eyes")) kf.optString("eyes") else null,
+                            mouth = if (kf.has("mouth")) kf.optString("mouth") else null,
                         )
                     }
                     overlay.state.startCustomAnimation(keyframes)

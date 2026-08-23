@@ -6,13 +6,14 @@ import android.graphics.Paint
 import android.graphics.Path
 
 /**
- * Shared face/gender-accessory drawing for RigView - same 6-expression vocabulary and geometry
- * (relative to the head's own center/radius in canvas space) as the desktop's renderer/face.js,
- * so a character looks the same on both platforms and in CreateCharacterActivity's preview as it
- * does live.
+ * Shared face/gender-accessory drawing for RigView - same geometry (relative to the head's own
+ * center/radius in canvas space) as the desktop's renderer/face.js, so a character looks the same
+ * on both platforms and in CreateCharacterActivity's preview as it does live. Eyes and mouth are
+ * independent axes (not a single bundled "emotion") so the AI can mix any pair.
  */
 object FaceRenderer {
-    val EMOTIONS = listOf("neutral", "happy", "sad", "angry", "surprised", "love")
+    val EYE_STYLES = listOf("normal", "wide", "angry", "heart")
+    val MOUTH_STYLES = listOf("neutral", "smile", "frown", "open", "angry")
 
     private val fillBlack = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = Color.BLACK }
     private val strokeBlack = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -25,8 +26,8 @@ object FaceRenderer {
     private fun drawEyes(canvas: Canvas, cx: Float, cy: Float, r: Float, style: String) {
         val dx = r * 0.35f
         val dy = -r * 0.1f
-        val eyeR = if (style == "surprised") r * 0.22f else r * 0.13f
-        if (style == "love") {
+        val eyeR = if (style == "wide") r * 0.22f else r * 0.13f
+        if (style == "heart") {
             for (sign in intArrayOf(-1, 1)) {
                 val ex = cx + sign * dx
                 val ey = cy + dy
@@ -61,13 +62,13 @@ object FaceRenderer {
         val my = cy + r * 0.35f
         strokeBlack.strokeWidth = (r * 0.08f).coerceAtLeast(1f)
         when (style) {
-            "happy", "love" -> {
+            "smile" -> {
                 val path = Path()
                 val rect = android.graphics.RectF(cx - r * 0.32f, my - r * 0.15f - r * 0.32f, cx + r * 0.32f, my - r * 0.15f + r * 0.32f)
                 path.addArc(rect, 27f, 126f)
                 canvas.drawPath(path, strokeBlack)
             }
-            "sad" -> {
+            "frown" -> {
                 val path = Path()
                 val rect = android.graphics.RectF(cx - r * 0.32f, my + r * 0.35f - r * 0.32f, cx + r * 0.32f, my + r * 0.35f + r * 0.32f)
                 path.addArc(rect, 207f, 126f)
@@ -81,15 +82,14 @@ object FaceRenderer {
                 }
                 canvas.drawPath(path, strokeBlack)
             }
-            "surprised" -> canvas.drawCircle(cx, my, r * 0.14f, fillBlack)
+            "open" -> canvas.drawCircle(cx, my, r * 0.14f, fillBlack)
             else -> canvas.drawLine(cx - r * 0.22f, my, cx + r * 0.22f, my, strokeBlack)
         }
     }
 
-    fun drawFace(canvas: Canvas, cx: Float, cy: Float, r: Float, emotion: String?) {
-        val style = if (EMOTIONS.contains(emotion)) emotion!! else "neutral"
-        drawEyes(canvas, cx, cy, r, style)
-        drawMouth(canvas, cx, cy, r, style)
+    fun drawFace(canvas: Canvas, cx: Float, cy: Float, r: Float, eyeStyle: String?, mouthStyle: String?) {
+        drawEyes(canvas, cx, cy, r, if (EYE_STYLES.contains(eyeStyle)) eyeStyle!! else "normal")
+        drawMouth(canvas, cx, cy, r, if (MOUTH_STYLES.contains(mouthStyle)) mouthStyle!! else "neutral")
     }
 
     /** A small bow sitting on top of the head - the only gender-driven visual difference (see Prefs.kt). */

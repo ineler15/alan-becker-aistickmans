@@ -17,7 +17,8 @@ const poseId = params.get('poseProfile') || characterId;
 // metaFor()); built-in characters get neither, same as before this existed.
 const hasFace = params.get('hasFace') === '1';
 const gender = params.get('gender') || 'otro';
-let currentFaceEmotion = 'neutral';
+let currentEyeStyle = 'normal';
+let currentMouthStyle = 'neutral';
 // The rig's own visual box (jsCharacterEngine.js's RIG_WIDTH/RIG_HEIGHT) - kept separate from the
 // actual (larger) window size, which pads out extra room for the speech bubble. Falls back to the
 // window's own size if launched without these (e.g. the older standalone rig-test page).
@@ -211,7 +212,7 @@ function draw() {
   }
 
   if (headAnchor) {
-    if (hasFace) window.FaceRenderer.drawFace(ctx, headAnchor.x, headAnchor.y, headAnchor.r, currentFaceEmotion);
+    if (hasFace) window.FaceRenderer.drawFace(ctx, headAnchor.x, headAnchor.y, headAnchor.r, currentEyeStyle, currentMouthStyle);
     window.FaceRenderer.drawGenderAccessory(ctx, headAnchor.x, headAnchor.y, headAnchor.r, gender);
   }
 }
@@ -219,7 +220,8 @@ function draw() {
 ipcRenderer.on('character:pose', (_event, payload) => {
   if (payload.id !== characterId) return;
   currentPose = window.PoseLibrary.forDescriptor(payload.descriptor, poseId);
-  if (payload.faceEmotion) currentFaceEmotion = payload.faceEmotion;
+  if (payload.eyeStyle) currentEyeStyle = payload.eyeStyle;
+  if (payload.mouthStyle) currentMouthStyle = payload.mouthStyle;
   if (payload.lookRight !== undefined) lookRight = payload.lookRight;
   canvas.style.transform = lookRight ? 'scaleX(-1)' : 'none';
   if (payload.speechText) {

@@ -154,7 +154,8 @@ function tick() {
       descriptor,
       lookRight: entry.state.lookRight,
       speechText: entry.state.speechText,
-      faceEmotion: entry.state.faceEmotion,
+      eyeStyle: entry.state.eyeStyle,
+      mouthStyle: entry.state.mouthStyle,
     });
   }
 }

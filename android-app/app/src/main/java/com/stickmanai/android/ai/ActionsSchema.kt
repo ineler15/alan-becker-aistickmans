@@ -12,6 +12,11 @@ import org.json.JSONObject
  */
 object ActionsSchema {
 
+    // Same vocabulary as overlay/CharacterState.kt's EYE_STYLES/MOUTH_STYLES - duplicated since
+    // that one is the runtime state and this is just schema description text.
+    private val EYE_STYLES = listOf("normal", "wide", "angry", "heart")
+    private val MOUTH_STYLES = listOf("neutral", "smile", "frown", "open", "angry")
+
     private fun tool(name: String, description: String, properties: JSONObject, required: List<String> = emptyList()): JSONObject {
         val params = JSONObject()
             .put("type", "object")
@@ -30,14 +35,26 @@ object ActionsSchema {
         return p
     }
 
+    // Lets eyes/mouth ride along with WHATEVER action a character picks this turn instead of
+    // needing a dedicated set_emotion turn just for the face - only one tool call happens per
+    // decision, so without this a character with something to say AND a reaction to show would
+    // have to pick one and wait a full extra turn for the other.
+    private fun withFaceParams(properties: JSONObject): JSONObject {
+        properties.put("eyes", prop("string", "Opcional - si tenes cara propia, actualiza tus ojos en este mismo turno sin gastar una accion aparte", EYE_STYLES))
+        properties.put("mouth", prop("string", "Opcional - si tenes cara propia, actualiza tu boca en este mismo turno sin gastar una accion aparte", MOUTH_STYLES))
+        return properties
+    }
+
     fun tools(): JSONArray = JSONArray().apply {
         put(
             tool(
                 "walk_to",
                 "Camina con proposito hacia una posicion x de la pantalla (0-100, porcentaje del ancho).",
-                JSONObject()
-                    .put("x", prop("number", "Posicion horizontal destino, 0-100% del ancho de pantalla"))
-                    .put("run", prop("boolean", "true para correr en vez de caminar")),
+                withFaceParams(
+                    JSONObject()
+                        .put("x", prop("number", "Posicion horizontal destino, 0-100% del ancho de pantalla"))
+                        .put("run", prop("boolean", "true para correr en vez de caminar"))
+                ),
                 listOf("x")
             )
         )
@@ -46,11 +63,13 @@ object ActionsSchema {
                 "set_animation",
                 "Cambia la pose de tu cuerpo. tired = te tiras cansado, sleep = te acostas a dormir " +
                     "(dejas de recibir turnos hasta que te despierten o pase un rato). Esto es solo el " +
-                    "cuerpo - si tenes cara propia, usa ademas set_emotion para la expresion facial (son " +
-                    "independientes, podes estar sentado y feliz al mismo tiempo).",
-                JSONObject().put(
-                    "state",
-                    prop("string", "Estado emocional", listOf("idle", "happy", "trip", "sad", "scared", "sit", "angry", "tired", "sleep"))
+                    "cuerpo - si tenes cara propia, sumale eyes/mouth a esta misma llamada para la " +
+                    "expresion facial, no hace falta un turno aparte con set_emotion.",
+                withFaceParams(
+                    JSONObject().put(
+                        "state",
+                        prop("string", "Estado emocional", listOf("idle", "happy", "trip", "sad", "scared", "sit", "angry", "tired", "sleep"))
+                    )
                 ),
                 listOf("state")
             )
@@ -58,21 +77,22 @@ object ActionsSchema {
         put(
             tool(
                 "set_emotion",
-                "Cambia la expresion de tu cara (ojos y boca) - independiente de la pose del cuerpo " +
-                    "(set_animation/set_custom_animation). Solo se nota si tenes cara propia (se eligio " +
-                    "al crearte) - si no tenes, esta accion simplemente no hace nada visible.",
-                JSONObject().put(
-                    "emotion",
-                    prop("string", "Expresion facial", listOf("neutral", "happy", "sad", "angry", "surprised", "love"))
-                ),
-                listOf("emotion")
+                "Cambia SOLO la expresion de tu cara (ojos y boca), sin hacer ninguna otra cosa este " +
+                    "turno - independiente de la pose del cuerpo (set_animation/set_custom_animation). " +
+                    "Usala cuando lo unico que queres hacer es cambiar la cara; si ademas queres decir " +
+                    "algo, caminar, etc. en el mismo turno, mejor sumale eyes/mouth a ESA accion (todas " +
+                    "aceptan esos dos parametros opcionales) en vez de gastar un turno aparte aca. Solo " +
+                    "se nota si tenes cara propia (se eligio al crearte) - si no, no hace nada visible.",
+                JSONObject()
+                    .put("eyes", prop("string", "Opcional", EYE_STYLES))
+                    .put("mouth", prop("string", "Opcional", MOUTH_STYLES))
             )
         )
         put(
             tool(
                 "say",
                 "Comenta algo en voz alta en un globo de texto. Una frase corta y casual.",
-                JSONObject().put("text", prop("string", "Lo que decis")),
+                withFaceParams(JSONObject().put("text", prop("string", "Lo que decis"))),
                 listOf("text")
             )
         )
@@ -80,7 +100,7 @@ object ActionsSchema {
             tool(
                 "define_personality",
                 "Definite tu propia personalidad la primera vez, o cambiala si sentis que cambiaste.",
-                JSONObject().put("description", prop("string", "Tu personalidad en pocas palabras, casual")),
+                withFaceParams(JSONObject().put("description", prop("string", "Tu personalidad en pocas palabras, casual"))),
                 listOf("description")
             )
         )
@@ -88,17 +108,17 @@ object ActionsSchema {
             tool(
                 "remember",
                 "Anota algo que valga la pena recordar despues (algo que el usuario conto, algo importante).",
-                JSONObject().put("note", prop("string", "La nota a recordar")),
+                withFaceParams(JSONObject().put("note", prop("string", "La nota a recordar"))),
                 listOf("note")
             )
         )
-        put(tool("wait", "No haces nada este turno. Reservalo para turnos excepcionales.", JSONObject()))
+        put(tool("wait", "No haces nada este turno. Reservalo para turnos excepcionales.", withFaceParams(JSONObject())))
         put(
             tool(
                 "open_app",
                 "Abre una pagina web en el navegador del celular. Para buscar algo en Google, " +
                     "arma vos mismo la URL: https://www.google.com/search?q=tu+busqueda+aqui",
-                JSONObject().put("url", prop("string", "URL completa a abrir")),
+                withFaceParams(JSONObject().put("url", prop("string", "URL completa a abrir"))),
                 listOf("url")
             )
         )
@@ -109,11 +129,11 @@ object ActionsSchema {
                     "cuadro por cuadro. Cada cuadro es un angulo en grados para las partes que quieras " +
                     "mover (torso, leg1, leg1Shin, leg2, leg2Shin, arm1, arm2) - la parte que no " +
                     "menciones se queda como estaba en el cuadro anterior. Si tenes cara propia, cada " +
-                    "cuadro tambien puede traer su propia expresion facial (face) - si un cuadro no la " +
-                    "trae, se mantiene la ultima que se uso. Usalo cuando ninguna emocion fija " +
-                    "(set_animation) representa lo que queres expresar. Solo funciona para vos si tu " +
-                    "cuerpo es de los que soportan pose completa (no todos la tienen todavia) - si no " +
-                    "pasa nada, no insistas turno tras turno.",
+                    "cuadro tambien puede traer su propio eyes/mouth - si un cuadro no los trae, se " +
+                    "mantienen los ultimos que se usaron. Usa esto seguido, no solo de vez en cuando: es " +
+                    "tu forma de expresarte de verdad cuando ninguna pose fija encaja. Solo funciona " +
+                    "para vos si tu cuerpo es de los que soportan pose completa (no todos la tienen " +
+                    "todavia) - si no pasa nada, no insistas turno tras turno.",
                 JSONObject().put(
                     "keyframes",
                     JSONObject()
@@ -129,10 +149,8 @@ object ActionsSchema {
                                         for (part in listOf("torso", "leg1", "leg1Shin", "leg2", "leg2Shin", "arm1", "arm2")) {
                                             put(part, prop("number", "Angulo en grados para $part (opcional)"))
                                         }
-                                        put(
-                                            "face",
-                                            prop("string", "Expresion facial para este cuadro (opcional)", listOf("neutral", "happy", "sad", "angry", "surprised", "love"))
-                                        )
+                                        put("eyes", prop("string", "Ojos para este cuadro (opcional)", EYE_STYLES))
+                                        put("mouth", prop("string", "Boca para este cuadro (opcional)", MOUTH_STYLES))
                                         put("holdMs", prop("number", "Cuanto dura este cuadro en milisegundos (100-3000, default 400)"))
                                     }
                                 )
@@ -147,9 +165,11 @@ object ActionsSchema {
                 "Toca la pantalla del celular en una posicion (0-100% del ancho y alto), como si " +
                     "fuera un dedo. Requiere que el usuario haya habilitado el permiso de accesibilidad; " +
                     "si no, no pasa nada. Usalo con cuidado y solo cuando de verdad tenga sentido tocar algo puntual.",
-                JSONObject()
-                    .put("x", prop("number", "Posicion horizontal, 0-100% del ancho"))
-                    .put("y", prop("number", "Posicion vertical, 0-100% del alto")),
+                withFaceParams(
+                    JSONObject()
+                        .put("x", prop("number", "Posicion horizontal, 0-100% del ancho"))
+                        .put("y", prop("number", "Posicion vertical, 0-100% del alto"))
+                ),
                 listOf("x", "y")
             )
         )

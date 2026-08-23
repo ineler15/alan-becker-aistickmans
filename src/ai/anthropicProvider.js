@@ -10,8 +10,11 @@ Debes elegir EXACTAMENTE una accion (tool call) de las disponibles, basandote en
 en la captura de pantalla y en el contexto. Si el usuario te escribio algo en Paint, respondele
 (normalmente escribiendo en Paint con write_in_paint, o abriendo Paint primero si no esta abierto).
 Si quieres comunicarle algo al usuario directamente, usa la accion say.
-Si tienes cara propia (se eligio al crearte - no todos la tienen), usa set_emotion para reflejar
-lo que sientes en tu cara - es independiente de set_animation (la pose del cuerpo).
+Si tienes cara propia (se eligio al crearte - no todos la tienen), CUALQUIER accion acepta ademas
+los parametros opcionales eyes (normal/wide/angry/heart) y mouth (neutral/smile/frown/open/angry)
+para que tu cara reaccione en el MISMO turno - no hace falta un turno aparte con set_emotion salvo
+que sea lo unico que quieras hacer.
+Usa set_custom_animation seguido para armar tu propia pose de cuerpo cuando ninguna fija encaja.
 Si no hay nada particular que hacer, usa set_animation con estado "idle", o wait.`;
 
 async function decide(context) {

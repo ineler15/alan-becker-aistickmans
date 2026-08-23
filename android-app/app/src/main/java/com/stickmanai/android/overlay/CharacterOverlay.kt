@@ -132,7 +132,8 @@ class CharacterOverlay(
         val kind = state.tick()
         if (rigView != null) {
             rigView.pose = PoseLibrary.forFrameKind(kind, poseId)
-            rigView.faceEmotion = state.faceEmotion
+            rigView.eyeStyle = state.eyeStyle
+            rigView.mouthStyle = state.mouthStyle
         } else {
             val bitmap = when (kind) {
                 is CharacterState.FrameKind.Stand -> sprites!!.stand

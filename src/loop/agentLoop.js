@@ -162,6 +162,11 @@ async function tickCharacter(character, perception, userMessageText) {
       config.decideTimeoutMs,
       `provider.decide[${characterId}]`
     );
+    // Captured before the repeat-guard below can swap `tool`/`args` out from under the model
+    // (e.g. forcing wait/walk_to) - a pending face reaction shouldn't get silently dropped just
+    // because the body action it rode in on got overridden. See actions.schema.js's EYES_PARAM.
+    const requestedEyes = args && args.eyes;
+    const requestedMouth = args && args.mouth;
 
     if (tool === 'say') {
       turnsSinceSayById.set(characterId, 0);
@@ -183,6 +188,13 @@ async function tickCharacter(character, perception, userMessageText) {
       repeatStreakById.set(characterId, 0);
     }
     lastToolById.set(characterId, tool);
+
+    // Let eyes/mouth ride along regardless of which tool actually ran this turn, so a character
+    // doesn't need a whole separate decision cycle just to update its face - see
+    // actions.schema.js's EYES_PARAM/MOUTH_PARAM (every action accepts these two optional params).
+    if (tool !== 'set_emotion' && (requestedEyes || requestedMouth)) {
+      executor.execute('set_emotion', { eyes: requestedEyes, mouth: requestedMouth }, characterId).catch(() => {});
+    }
 
     const { ok, result } = await withTimeout(
       executor.execute(tool, args || {}, characterId),

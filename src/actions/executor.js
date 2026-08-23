@@ -81,8 +81,8 @@ async function execute(name, args, characterId) {
       shimeji.sendCommand(characterId, 'set_animation', { state: args.state, caption: args.caption });
       return { ok: true, result: 'animacion actualizada' };
     case 'set_emotion':
-      shimeji.sendCommand(characterId, 'set_emotion', { emotion: args.emotion });
-      return { ok: true, result: 'emocion actualizada' };
+      shimeji.sendCommand(characterId, 'set_emotion', { eyes: args.eyes, mouth: args.mouth });
+      return { ok: true, result: 'cara actualizada' };
     case 'say':
       shimeji.sendCommand(characterId, 'say', { text: args.text });
       return { ok: true, result: 'mensaje mostrado' };

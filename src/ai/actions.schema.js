@@ -106,8 +106,8 @@ const ACTIONS = [
       'Cambia la pose del cuerpo del stickman. ' +
       'happy=salta contento, dance=baila, trip=se tropieza/queda confundido, scared=corre asustado, ' +
       'sad=se cae, tired=se tira en un sillon, sleep=se acuesta, jump=salta, sit=se sienta. Esto es ' +
-      'solo el cuerpo - si tenes cara propia, usa ademas set_emotion para la expresion facial (son ' +
-      'independientes entre si, podes estar sentado y feliz al mismo tiempo).',
+      'solo el cuerpo - si tenes cara propia, sumale eyes/mouth a esta misma llamada (ver mas abajo) ' +
+      'para la expresion facial, no hace falta un turno aparte con set_emotion.',
     params: {
       state: 'string (idle|walk|think|talk|point|wave|jump|sit|sleep|tired|happy|dance|trip|scared|sad)',
       caption: 'string (opcional)',
@@ -117,11 +117,16 @@ const ACTIONS = [
   {
     name: 'set_emotion',
     desc:
-      'Cambia la expresion de tu cara (ojos y boca) - independiente de la pose del cuerpo ' +
-      '(set_animation/set_custom_animation), asi que podes combinarla con cualquier pose. Solo se ' +
-      'nota si tenes cara propia (se eligio al crearte) - si no tenes, esta accion simplemente no ' +
-      'hace nada visible.',
-    params: { emotion: 'string (neutral|happy|sad|angry|surprised|love)' },
+      'Cambia SOLO la expresion de tu cara (ojos y boca), sin hacer ninguna otra cosa este turno - ' +
+      'independiente de la pose del cuerpo (set_animation/set_custom_animation). Usala cuando lo ' +
+      'unico que queres hacer es cambiar la cara; si ademas queres decir algo, caminar, etc. en el ' +
+      'mismo turno, mejor sumale eyes/mouth a ESA accion (todas las acciones aceptan esos dos ' +
+      'parametros opcionales) en vez de gastar un turno aparte en set_emotion. Solo se nota si tenes ' +
+      'cara propia (se eligio al crearte) - si no tenes, no hace nada visible.',
+    params: {
+      eyes: 'string (opcional: normal|wide|angry|heart)',
+      mouth: 'string (opcional: neutral|smile|frown|open|angry)',
+    },
     risky: false,
   },
   {
@@ -131,14 +136,14 @@ const ACTIONS = [
       'posturas (keyframes) que se van a reproducir en orden, cada una mantenida un ratito (holdMs) antes ' +
       'de pasar a la siguiente. Cada keyframe es un angulo (en grados) para las partes del cuerpo que ' +
       'quieras mover ese paso - las que no incluyas se quedan como estaban. Si tenes cara propia, cada ' +
-      'keyframe tambien puede traer su propia expresion facial (face) - si un keyframe no la trae, se ' +
-      'mantiene la ultima que se uso. Usalo para gestos o bailes unicos que no encajan en ninguna pose ' +
-      'predefinida.',
+      'keyframe tambien puede traer su propio eyes/mouth - si un keyframe no los trae, se mantienen los ' +
+      'ultimos que se usaron. Usa esto seguido, no solo de vez en cuando: es tu forma de expresarte de ' +
+      'verdad cuando ninguna pose predefinida encaja (un gesto, un baile, una reaccion fisica unica).',
     params: {
       keyframes:
         'array de objetos (JSON string o array) - cada uno con angulos opcionales para ' +
-        'torso/leg1/leg1Shin/leg2/leg2Shin/arm1/arm2 (numeros, grados), face opcional ' +
-        '(string: neutral|happy|sad|angry|surprised|love) y holdMs opcional (100-3000, default 400)',
+        'torso/leg1/leg1Shin/leg2/leg2Shin/arm1/arm2 (numeros, grados), eyes/mouth opcionales ' +
+        '(mismos valores que set_emotion) y holdMs opcional (100-3000, default 400)',
     },
     risky: false,
   },
@@ -162,6 +167,19 @@ const ACTIONS = [
     risky: false,
   },
 ];
+
+// Lets eyes/mouth ride along with WHATEVER action a character picks this turn (say, walk_to,
+// etc.) instead of needing a dedicated set_emotion turn just for the face - only one tool call
+// happens per decision, so without this a character with something to say AND a reaction to show
+// would have to pick one and wait a full extra turn for the other. set_emotion already declares
+// these as its own primary params, so it's skipped here to avoid a duplicate-key no-op.
+const EYES_PARAM = 'string (opcional) - si tenes cara propia, actualiza tus ojos en este mismo turno (normal|wide|angry|heart) sin gastar una accion aparte';
+const MOUTH_PARAM = 'string (opcional) - si tenes cara propia, actualiza tu boca en este mismo turno (neutral|smile|frown|open|angry) sin gastar una accion aparte';
+for (const action of ACTIONS) {
+  if (action.name === 'set_emotion') continue;
+  action.params.eyes = EYES_PARAM;
+  action.params.mouth = MOUTH_PARAM;
+}
 
 function toAnthropicTools() {
   return ACTIONS.map((a) => ({

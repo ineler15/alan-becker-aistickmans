@@ -1,17 +1,19 @@
 // Shared face/gender-accessory drawing, used by the real per-character renderer (character.js),
 // the "crear tu propio stickman" preview (createCharacter.js), and mirrored on Android in
-// RigView.kt - same 6-expression vocabulary and geometry (relative to the head's own center/radius
-// in already-transformed canvas space) everywhere, so a character looks the same on both
-// platforms and in the creator's preview as it does live.
+// RigView.kt. Eyes and mouth are independent axes (not a single bundled "emotion") so the AI can
+// mix any pair - e.g. wide eyes + a frown - instead of only 6 fixed combos. Geometry is relative
+// to the head's own center/radius in already-transformed canvas space, so a character looks the
+// same on both platforms and in the creator's preview as it does live.
 (function () {
-  const EMOTIONS = ['neutral', 'happy', 'sad', 'angry', 'surprised', 'love'];
+  const EYE_STYLES = ['normal', 'wide', 'angry', 'heart'];
+  const MOUTH_STYLES = ['neutral', 'smile', 'frown', 'open', 'angry'];
 
   function drawEyes(ctx, cx, cy, r, style) {
     const dx = r * 0.35;
     const dy = -r * 0.1;
-    const eyeR = style === 'surprised' ? r * 0.22 : r * 0.13;
+    const eyeR = style === 'wide' ? r * 0.22 : r * 0.13;
     ctx.fillStyle = '#000';
-    if (style === 'love') {
+    if (style === 'heart') {
       for (const sign of [-1, 1]) {
         const ex = cx + sign * dx;
         const ey = cy + dy;
@@ -52,12 +54,11 @@
     ctx.lineCap = 'round';
     ctx.beginPath();
     switch (style) {
-      case 'happy':
-      case 'love':
+      case 'smile':
         ctx.arc(cx, my - r * 0.15, r * 0.32, 0.15 * Math.PI, 0.85 * Math.PI);
         ctx.stroke();
         break;
-      case 'sad':
+      case 'frown':
         ctx.arc(cx, my + r * 0.35, r * 0.32, 1.15 * Math.PI, 1.85 * Math.PI);
         ctx.stroke();
         break;
@@ -67,7 +68,7 @@
         ctx.lineTo(cx + r * 0.28, my + r * 0.05);
         ctx.stroke();
         break;
-      case 'surprised':
+      case 'open':
         ctx.fillStyle = '#000';
         ctx.arc(cx, my, r * 0.14, 0, Math.PI * 2);
         ctx.fill();
@@ -79,10 +80,9 @@
     }
   }
 
-  function drawFace(ctx, cx, cy, r, emotion) {
-    const style = EMOTIONS.includes(emotion) ? emotion : 'neutral';
-    drawEyes(ctx, cx, cy, r, style);
-    drawMouth(ctx, cx, cy, r, style);
+  function drawFace(ctx, cx, cy, r, eyeStyle, mouthStyle) {
+    drawEyes(ctx, cx, cy, r, EYE_STYLES.includes(eyeStyle) ? eyeStyle : 'normal');
+    drawMouth(ctx, cx, cy, r, MOUTH_STYLES.includes(mouthStyle) ? mouthStyle : 'neutral');
   }
 
   // A small bow sitting on top of the head - the only gender-driven visual difference (see
@@ -106,5 +106,5 @@
     ctx.fill();
   }
 
-  window.FaceRenderer = { EMOTIONS, drawFace, drawGenderAccessory };
+  window.FaceRenderer = { EYE_STYLES, MOUTH_STYLES, drawFace, drawGenderAccessory };
 })();

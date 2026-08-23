@@ -27,9 +27,14 @@ class RigView(
             invalidate()
         }
 
-    // Independent of `pose` (body) - see CharacterState.kt's faceEmotion. Only ever meaningful
-    // when hasFace is true; harmless to set otherwise.
-    var faceEmotion: String = "neutral"
+    // Independent of `pose` (body) - see CharacterState.kt's eyeStyle/mouthStyle. Only ever
+    // meaningful when hasFace is true; harmless to set otherwise.
+    var eyeStyle: String = "normal"
+        set(value) {
+            field = value
+            invalidate()
+        }
+    var mouthStyle: String = "neutral"
         set(value) {
             field = value
             invalidate()
@@ -147,7 +152,7 @@ class RigView(
         }
 
         headCenter?.let { center ->
-            if (hasFace) FaceRenderer.drawFace(canvas, center.x, center.y, headRadius, faceEmotion)
+            if (hasFace) FaceRenderer.drawFace(canvas, center.x, center.y, headRadius, eyeStyle, mouthStyle)
             FaceRenderer.drawGenderAccessory(canvas, center.x, center.y, headRadius, gender)
         }
     }
