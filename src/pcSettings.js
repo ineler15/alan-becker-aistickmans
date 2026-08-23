@@ -17,6 +17,9 @@ function load() {
       provider: config.aiProvider,
       sharedApiKey: '',
       perCharacterKeys: {},
+      // Per-character provider override ('' / absent = use the shared `provider` above),
+      // mirrors Android's per-node provider Spinner (Prefs.kt's providerFor/setProviderFor).
+      perCharacterProvider: {},
       // No settings file yet (first run) - default to the same subset that used to be
       // hardcoded in characters.js, so behavior is unchanged until the user touches a checkbox.
       enabledIds: CHARACTERS.map((c) => c.id),
@@ -39,25 +42,36 @@ function save(settings) {
   fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2));
 }
 
+const KEY_ENV_VAR = {
+  anthropic: 'ANTHROPIC_API_KEY',
+  gemini: 'GEMINI_API_KEY',
+  openai: 'OPENAI_API_KEY',
+  groq: 'GROQ_API_KEY',
+  openrouter: 'OPENROUTER_API_KEY',
+};
+
 // Applies saved settings into process.env BEFORE startCharacterEngine()/agentLoop.start() are called,
 // so the existing config.js/provider.js machinery (which reads process.env fresh on every call,
 // see config.gemini.apiKeyFor) picks them up with no changes to that code at all.
 function applyToEnv(settings) {
   if (settings.provider) process.env.AI_PROVIDER = settings.provider;
-  const keyEnvVar = {
-    anthropic: 'ANTHROPIC_API_KEY',
-    gemini: 'GEMINI_API_KEY',
-    openai: 'OPENAI_API_KEY',
-    groq: 'GROQ_API_KEY',
-    openrouter: 'OPENROUTER_API_KEY',
-  }[settings.provider];
+  const keyEnvVar = KEY_ENV_VAR[settings.provider];
   if (keyEnvVar && settings.sharedApiKey) process.env[keyEnvVar] = settings.sharedApiKey;
-  // Per-character key override only actually does anything for gemini today - see
-  // config.gemini.apiKeyFor(characterId), the only provider with that per-character lookup.
-  if (settings.provider === 'gemini') {
-    for (const [id, key] of Object.entries(settings.perCharacterKeys || {})) {
-      if (key) process.env[`GEMINI_API_KEY_${id.toUpperCase()}`] = key;
-    }
+
+  // Per-character provider override (config.providerFor/getProvider read this) - '' or absent
+  // means that character just uses the shared `provider` above.
+  for (const [id, provider] of Object.entries(settings.perCharacterProvider || {})) {
+    if (provider) process.env[`AI_PROVIDER_${id.toUpperCase()}`] = provider;
+  }
+
+  // Per-character key override, keyed to THAT character's own effective provider (its override,
+  // falling back to the shared one) - not always gemini, now that providers can differ per
+  // character too. See config.<provider>.apiKeyFor(characterId).
+  for (const [id, key] of Object.entries(settings.perCharacterKeys || {})) {
+    if (!key) continue;
+    const effectiveProvider = (settings.perCharacterProvider || {})[id] || settings.provider;
+    const envVar = KEY_ENV_VAR[effectiveProvider];
+    if (envVar) process.env[`${envVar}_${id.toUpperCase()}`] = key;
   }
 }
 

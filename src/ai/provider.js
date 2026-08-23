@@ -1,7 +1,7 @@
 const config = require('../config');
 
-function getProvider() {
-  switch (config.aiProvider) {
+function getProvider(characterId) {
+  switch (config.providerFor(characterId)) {
     case 'openrouter':
       return require('./openrouterProvider');
     case 'groq':

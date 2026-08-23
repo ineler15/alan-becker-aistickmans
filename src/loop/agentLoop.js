@@ -94,7 +94,7 @@ function purposefulWalkTarget(perception, status) {
 async function tickCharacter(character, perception, userMessageText) {
   const { id: characterId } = character;
   try {
-    const provider = getProvider();
+    const provider = getProvider(characterId);
     const status = shimeji.readStatus(characterId);
     const screenshotBase64 = perception
       ? await cropForCharacter(perception.screenshot, status)

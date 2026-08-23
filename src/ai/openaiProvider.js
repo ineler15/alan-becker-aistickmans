@@ -33,7 +33,8 @@ que dijeron con say). No estas solo: podes comentarles algo, reaccionar a lo que
 walk_to para acercarte a uno de ellos, siempre siendo fiel a tu propia personalidad.`;
 
 async function decide(context) {
-  const { screenshotBase64, personality, ...contextForModel } = context;
+  const { screenshotBase64, personality, characterId, ...contextForModel } = context;
+  const apiKey = characterId ? config.openai.apiKeyFor(characterId) : config.openai.apiKey;
 
   const userContent = [{ type: 'text', text: JSON.stringify(contextForModel) }];
   if (screenshotBase64) {
@@ -46,7 +47,7 @@ async function decide(context) {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${config.openai.apiKey}`,
+      Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({

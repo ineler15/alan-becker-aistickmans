@@ -14,8 +14,10 @@ async function init() {
 
   const charList = document.getElementById('charList');
   const keyInputs = {};
+  const providerSelects = {};
   const checkboxes = {};
   const enabledIds = new Set(settings.enabledIds || []);
+  const perCharacterProvider = settings.perCharacterProvider || {};
   for (const c of characters) {
     const row = document.createElement('div');
     row.className = 'char-row';
@@ -29,6 +31,20 @@ async function init() {
     const label = document.createElement('span');
     label.textContent = c.displayName;
 
+    const charProviderSelect = document.createElement('select');
+    const sharedOpt = document.createElement('option');
+    sharedOpt.value = '';
+    sharedOpt.textContent = '(compartido)';
+    charProviderSelect.appendChild(sharedOpt);
+    for (const p of providers) {
+      const opt = document.createElement('option');
+      opt.value = p;
+      opt.textContent = p;
+      charProviderSelect.appendChild(opt);
+    }
+    charProviderSelect.value = perCharacterProvider[c.id] || '';
+    providerSelects[c.id] = charProviderSelect;
+
     const input = document.createElement('input');
     input.type = 'password';
     input.placeholder = 'API key propia (opcional)';
@@ -37,6 +53,7 @@ async function init() {
 
     row.appendChild(checkbox);
     row.appendChild(label);
+    row.appendChild(charProviderSelect);
     row.appendChild(input);
     charList.appendChild(row);
   }
@@ -44,11 +61,14 @@ async function init() {
   document.getElementById('continueBtn').addEventListener('click', () => {
     const perCharacterKeys = {};
     for (const id in keyInputs) perCharacterKeys[id] = keyInputs[id].value.trim();
+    const perCharacterProviderOut = {};
+    for (const id in providerSelects) perCharacterProviderOut[id] = providerSelects[id].value;
     const enabled = Object.keys(checkboxes).filter((id) => checkboxes[id].checked);
     window.stickmanAPI.savePcSettings({
       provider: providerSelect.value,
       sharedApiKey: document.getElementById('sharedKey').value.trim(),
       perCharacterKeys,
+      perCharacterProvider: perCharacterProviderOut,
       enabledIds: enabled,
     });
   });

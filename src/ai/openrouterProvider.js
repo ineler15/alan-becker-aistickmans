@@ -10,11 +10,12 @@ Si quieres comunicarle algo al usuario directamente, usa la accion say.
 Si no hay nada particular que hacer, usa set_animation con estado "idle", o wait.`;
 
 async function decide(context) {
-  const { screenshotBase64, personality, ...contextForModel } = context;
+  const { screenshotBase64, personality, characterId, ...contextForModel } = context;
+  const apiKey = characterId ? config.openrouter.apiKeyFor(characterId) : config.openrouter.apiKey;
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${config.openrouter.apiKey}`,
+      Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({

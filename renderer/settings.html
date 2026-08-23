@@ -49,6 +49,11 @@
         flex: 1;
         margin-top: 0;
       }
+      .char-row select {
+        width: 110px;
+        flex: none;
+        margin-top: 0;
+      }
       .hint {
         font-size: 11px;
         color: #888;
@@ -77,9 +82,9 @@
     <label>API key compartida (para el proveedor de arriba)</label>
     <input id="sharedKey" type="password" placeholder="Opcional si cada uno tiene la suya" />
     <div class="hint">
-      Tildá los personajes que querés que aparezcan. Las keys por personaje de abajo solo
-      aplican si el proveedor es "gemini" - asi cada uno tiene su propio cupo gratuito en vez de
-      compartir el de arriba.
+      Tildá los personajes que querés que aparezcan. Cada uno puede usar el proveedor
+      compartido de arriba ("compartido") o su propio proveedor + API key, para tener su
+      propio cupo gratuito en vez de compartir el de arriba.
     </div>
     <div id="charList"></div>
     <button id="continueBtn">Guardar y continuar</button>

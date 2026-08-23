@@ -2,7 +2,6 @@ const Anthropic = require('@anthropic-ai/sdk');
 const config = require('../config');
 const { toAnthropicTools } = require('./actions.schema');
 
-const client = new Anthropic({ apiKey: config.anthropic.apiKey });
 const tools = toAnthropicTools();
 
 const SYSTEM_PROMPT = `Cada turno recibes una captura de pantalla actual, la ventana activa del sistema,
@@ -14,7 +13,9 @@ Si quieres comunicarle algo al usuario directamente, usa la accion say.
 Si no hay nada particular que hacer, usa set_animation con estado "idle", o wait.`;
 
 async function decide(context) {
-  const { screenshotBase64, personality, ...contextForModel } = context;
+  const { screenshotBase64, personality, characterId, ...contextForModel } = context;
+  const apiKey = characterId ? config.anthropic.apiKeyFor(characterId) : config.anthropic.apiKey;
+  const client = new Anthropic({ apiKey });
 
   const content = [{ type: 'text', text: JSON.stringify(contextForModel) }];
   if (screenshotBase64) {

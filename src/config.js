@@ -7,13 +7,13 @@ const ROOT_DIR = path.join(__dirname, '..');
 // In a packaged build, ROOT_DIR resolves to inside app.asar - a single read-only file, not a
 // real directory, so creating a workspace folder "inside" it fails with ENOTDIR. Default to
 // Electron's writable per-user data dir there instead; dev (unpackaged) keeps using the
-// project folder like before.
-const DEFAULT_WORKSPACE_DIR = app.isPackaged
-  ? path.join(app.getPath('userData'), 'workspace')
-  : path.join(ROOT_DIR, 'workspace');
+// project folder like before. A relative WORKSPACE_DIR override (e.g. from a dev .env file
+// that predates this fix) must resolve against that same writable base when packaged, not
+// against ROOT_DIR, or it silently re-creates the ENOTDIR crash this was fixing.
+const WORKSPACE_BASE_DIR = app.isPackaged ? app.getPath('userData') : ROOT_DIR;
 const WORKSPACE_DIR = process.env.WORKSPACE_DIR
-  ? path.resolve(ROOT_DIR, process.env.WORKSPACE_DIR)
-  : DEFAULT_WORKSPACE_DIR;
+  ? path.resolve(WORKSPACE_BASE_DIR, process.env.WORKSPACE_DIR)
+  : path.join(WORKSPACE_BASE_DIR, 'workspace');
 
 if (!fs.existsSync(WORKSPACE_DIR)) {
   fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
@@ -30,12 +30,22 @@ const config = {
   get aiProvider() {
     return (process.env.AI_PROVIDER || 'anthropic').toLowerCase();
   },
+  // Per-character provider override (AI_PROVIDER_<ID>), same idea as gemini.apiKeyFor below -
+  // lets each character run on a different model instead of sharing one for the whole app.
+  providerFor(characterId) {
+    const perCharacter = characterId && process.env[`AI_PROVIDER_${characterId.toUpperCase()}`];
+    return (perCharacter || this.aiProvider).toLowerCase();
+  },
   anthropic: {
     get apiKey() {
       return process.env.ANTHROPIC_API_KEY || '';
     },
     get model() {
       return process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5';
+    },
+    apiKeyFor(characterId) {
+      const perCharacter = process.env[`ANTHROPIC_API_KEY_${characterId.toUpperCase()}`];
+      return perCharacter || this.apiKey;
     },
   },
   openrouter: {
@@ -45,6 +55,10 @@ const config = {
     get model() {
       return process.env.OPENROUTER_MODEL || 'anthropic/claude-sonnet-4.5';
     },
+    apiKeyFor(characterId) {
+      const perCharacter = process.env[`OPENROUTER_API_KEY_${characterId.toUpperCase()}`];
+      return perCharacter || this.apiKey;
+    },
   },
   groq: {
     get apiKey() {
@@ -53,6 +67,10 @@ const config = {
     get model() {
       return process.env.GROQ_MODEL || 'qwen/qwen3.6-27b';
     },
+    apiKeyFor(characterId) {
+      const perCharacter = process.env[`GROQ_API_KEY_${characterId.toUpperCase()}`];
+      return perCharacter || this.apiKey;
+    },
   },
   openai: {
     get apiKey() {
@@ -60,6 +78,10 @@ const config = {
     },
     get model() {
       return process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    },
+    apiKeyFor(characterId) {
+      const perCharacter = process.env[`OPENAI_API_KEY_${characterId.toUpperCase()}`];
+      return perCharacter || this.apiKey;
     },
   },
   gemini: {
