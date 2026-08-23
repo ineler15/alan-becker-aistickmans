@@ -26,7 +26,8 @@ const lastNotepadTextById = new Map();
 
 // Consecutive identical-tool decisions per character - the model doesn't reliably follow
 // prompt instructions to vary its behavior (e.g. it'll pick "say" or "wait" over and over),
-// so this forces a move_random after a few repeats instead of trusting the prompt alone.
+// so this forces a walk_to (if there's somewhere purposeful to go) or a wait after a few repeats
+// instead of trusting the prompt alone.
 const lastToolById = new Map();
 const repeatStreakById = new Map();
 
@@ -125,6 +126,16 @@ async function tickCharacter(character, perception, userMessageText) {
       });
     }
 
+    // Fixed fact from character creation (see customCharacters.js), not something the AI defines
+    // itself via define_personality - prepended so every provider picks it up for free, since
+    // they all already embed context.personality verbatim into the prompt.
+    const genderLine =
+      character.gender === 'femenino'
+        ? 'Tu genero es femenino. '
+        : character.gender === 'masculino'
+          ? 'Tu genero es masculino. '
+          : '';
+
     const context = {
       characterId,
       recentHistory: history.recent(characterId, 8),
@@ -136,10 +147,11 @@ async function tickCharacter(character, perception, userMessageText) {
       screenshotBase64,
       webcamBase64: webcam.get(),
       personality:
-        selfPersonality.load(characterId) ||
-        character.personality ||
-        'Todavia no definiste tu propia personalidad. Cuando quieras, usa define_personality para ' +
-          'decidir en tus propias palabras como sos.',
+        genderLine +
+        (selfPersonality.load(characterId) ||
+          character.personality ||
+          'Todavia no definiste tu propia personalidad. Cuando quieras, usa define_personality para ' +
+            'decidir en tus propias palabras como sos.'),
       peers,
       userMessage: userMessageText || null,
       forceSay: (turnsSinceSayById.get(characterId) || 0) >= SILENT_TURN_LIMIT,
@@ -161,9 +173,9 @@ async function tickCharacter(character, perception, userMessageText) {
     if (tool === lastToolById.get(characterId)) {
       const streak = (repeatStreakById.get(characterId) || 0) + 1;
       repeatStreakById.set(characterId, streak);
-      if (streak >= repeatLimit && tool !== 'move_random' && tool !== 'walk_to') {
+      if (streak >= repeatLimit && tool !== 'walk_to') {
         const target = purposefulWalkTarget(perception, status);
-        tool = target ? 'walk_to' : 'move_random';
+        tool = target ? 'walk_to' : 'wait';
         args = target || {};
         repeatStreakById.set(characterId, 0);
       }
@@ -197,12 +209,14 @@ async function tickCharacter(character, perception, userMessageText) {
     history.add(characterId, { tool: 'error', args: {}, ok: false, result: errorMessage });
     health.setError(characterId, errorMessage);
 
-    // A failed decide()/execute() (rate limit, timeout, etc.) shouldn't leave the
-    // character frozen - walk somewhere so there's still visible life on a bad turn.
+    // A failed decide()/execute() (rate limit, timeout, etc.) shouldn't error again on the
+    // fallback itself - 'wait' always succeeds. The character won't stand there forever either
+    // way: characterState.js's autonomous wander (IDLE_WALK_TIMEOUT_MS) kicks in on its own once
+    // enough time passes without a real decision, error or not.
     try {
-      const fallbackResult = await executor.execute('move_random', {}, characterId);
+      const fallbackResult = await executor.execute('wait', {}, characterId);
       history.add(characterId, {
-        tool: 'move_random',
+        tool: 'wait',
         args: {},
         ok: fallbackResult.ok,
         result: `fallback tras error (${errorMessage.slice(0, 80)}): ${fallbackResult.result}`,

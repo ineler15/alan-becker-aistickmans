@@ -55,7 +55,7 @@ function save(list) {
 function loadIntoRoster() {
   for (const custom of load()) {
     if (!CHARACTERS.ALL.some((c) => c.id === custom.id)) {
-      CHARACTERS.ALL.push({ id: custom.id, displayName: custom.displayName, personality: '' });
+      CHARACTERS.ALL.push({ id: custom.id, displayName: custom.displayName, personality: '', gender: custom.gender });
     }
   }
 }
@@ -82,7 +82,7 @@ function buildRig(color, headModel) {
   return template;
 }
 
-function create({ displayName, color, headModel }) {
+function create({ displayName, color, headModel, hasFace, gender }) {
   const name = (displayName || '').trim() || 'Stickman';
   const id = sanitizeId(name);
   const rig = buildRig(color, headModel);
@@ -90,12 +90,12 @@ function create({ displayName, color, headModel }) {
   fs.mkdirSync(CUSTOM_RIGS_DIR, { recursive: true });
   fs.writeFileSync(path.join(CUSTOM_RIGS_DIR, `${id}.json`), JSON.stringify(rig));
 
-  const record = { id, displayName: name, color, headModel };
+  const record = { id, displayName: name, color, headModel, hasFace: !!hasFace, gender: gender || 'otro' };
   const list = load();
   list.push(record);
   save(list);
 
-  CHARACTERS.ALL.push({ id, displayName: name, personality: '' });
+  CHARACTERS.ALL.push({ id, displayName: name, personality: '', gender: record.gender });
   return record;
 }
 
@@ -105,10 +105,16 @@ function customRigPath(id) {
 }
 
 // Null for a built-in character (or an unknown id) - callers should keep using the character's
-// own id as the pose lookup key in that case.
-function poseProfileFor(id) {
+// own id/no face/no accessory in that case. Consolidates what used to be a separate
+// poseProfileFor() lookup - one read of custom_characters.json instead of one per field.
+function metaFor(id) {
   const record = load().find((c) => c.id === id);
-  return record ? POSE_PROFILE_BY_HEAD_MODEL[record.headModel] || 'Red' : null;
+  if (!record) return null;
+  return {
+    poseProfile: POSE_PROFILE_BY_HEAD_MODEL[record.headModel] || 'Red',
+    hasFace: !!record.hasFace,
+    gender: record.gender || 'otro',
+  };
 }
 
 module.exports = {
@@ -116,5 +122,5 @@ module.exports = {
   loadIntoRoster,
   create,
   customRigPath,
-  poseProfileFor,
+  metaFor,
 };

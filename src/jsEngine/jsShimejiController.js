@@ -26,15 +26,15 @@ function sendCommand(characterId, tool, args = {}) {
     case 'walk_to':
       state.startMoving(args.x, !!args.run);
       break;
-    case 'move_random':
-      state.randomTarget(!!args.run);
-      break;
     case 'ride_mouse':
       // No mouse-riding physics in the JS engine yet - swallowed as a no-op instead of erroring
       // the AI's action out; it just doesn't visibly do anything until this is implemented.
       break;
     case 'set_animation':
       state.setEmotion(args.state);
+      break;
+    case 'set_emotion':
+      state.setFaceEmotion(args.emotion);
       break;
     case 'set_custom_animation':
       state.startCustomAnimation(Array.isArray(args.keyframes) ? args.keyframes : []);

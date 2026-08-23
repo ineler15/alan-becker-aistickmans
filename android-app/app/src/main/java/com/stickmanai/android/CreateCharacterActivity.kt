@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
 import android.widget.GridLayout
+import android.widget.SeekBar
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.stickmanai.android.databinding.ActivityCreateCharacterBinding
@@ -29,7 +30,10 @@ class CreateCharacterActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         buildSwatches()
+        setupColorSliders()
         binding.headGroup.setOnCheckedChangeListener { _, _ -> updatePreview() }
+        binding.checkHasFace.setOnCheckedChangeListener { _, _ -> updatePreview() }
+        binding.genderGroup.setOnCheckedChangeListener { _, _ -> updatePreview() }
         updatePreview()
 
         binding.btnCreate.setOnClickListener {
@@ -39,7 +43,7 @@ class CreateCharacterActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
             val headModel = if (isHollow()) "hollow" else "normal"
-            val def = Prefs.addCustomCharacter(this, name, headModel)
+            val def = Prefs.addCustomCharacter(this, name, headModel, binding.checkHasFace.isChecked, genderValue())
             val rig = RigTemplate.build(this, selectedColor, isHollow())
             RigTemplate.save(this, def.id, rig)
             finish()
@@ -47,6 +51,12 @@ class CreateCharacterActivity : AppCompatActivity() {
     }
 
     private fun isHollow(): Boolean = binding.radioHollow.isChecked
+
+    private fun genderValue(): String = when (binding.genderGroup.checkedRadioButtonId) {
+        binding.radioMasculino.id -> "masculino"
+        binding.radioFemenino.id -> "femenino"
+        else -> "otro"
+    }
 
     private fun buildSwatches() {
         val sizePx = (32 * resources.displayMetrics.density).toInt()
@@ -64,6 +74,7 @@ class CreateCharacterActivity : AppCompatActivity() {
                 }
                 setOnClickListener {
                     selectedColor = color
+                    syncSlidersToSelectedColor()
                     updatePreview()
                 }
             }
@@ -71,11 +82,45 @@ class CreateCharacterActivity : AppCompatActivity() {
         }
     }
 
+    // "Elegir cualquier color" - three plain RGB sliders instead of a real HSV picker widget
+    // (Android has none built in without pulling a third-party dependency) - still covers the
+    // full color space the swatches don't, which is all "selector avanzado" needs to mean here.
+    private fun setupColorSliders() {
+        val listener = object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (!fromUser) return
+                selectedColor = intArrayOf(binding.seekRed.progress, binding.seekGreen.progress, binding.seekBlue.progress, 255)
+                updateColorSwatchPreview()
+                updatePreview()
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        }
+        binding.seekRed.setOnSeekBarChangeListener(listener)
+        binding.seekGreen.setOnSeekBarChangeListener(listener)
+        binding.seekBlue.setOnSeekBarChangeListener(listener)
+        syncSlidersToSelectedColor()
+    }
+
+    private fun syncSlidersToSelectedColor() {
+        binding.seekRed.progress = selectedColor[0]
+        binding.seekGreen.progress = selectedColor[1]
+        binding.seekBlue.progress = selectedColor[2]
+        updateColorSwatchPreview()
+    }
+
+    private fun updateColorSwatchPreview() {
+        binding.colorSwatchPreview.background = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(Palette.toColorInt(selectedColor))
+        }
+    }
+
     private fun updatePreview() {
         val rig = RigTemplate.build(this, selectedColor, isHollow())
         val figure = RigFigure.fromJson(rig)
         binding.previewContainer.removeAllViews()
-        previewView = RigView(this, figure).apply {
+        previewView = RigView(this, figure, hasFace = binding.checkHasFace.isChecked, gender = genderValue()).apply {
             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         }
         binding.previewContainer.addView(previewView)

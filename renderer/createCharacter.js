@@ -50,7 +50,7 @@ function colorCss(rgba) {
   return `rgba(${rgba[0]},${rgba[1]},${rgba[2]},${rgba[3] / 255})`;
 }
 
-function draw(ctx, canvas, figure) {
+function draw(ctx, canvas, figure, hasFaceOn, genderVal) {
   const bones = layout(figure.root, 0, { x: 0, y: 0 }, []);
   if (!bones.length) return;
   const b = bounds(bones);
@@ -69,6 +69,9 @@ function draw(ctx, canvas, figure) {
   // curved bones (node.cr != 0) meant to be stroked as ONE smooth ring, not as separate straight
   // segments (which reads as a jagged octagon instead of a circle - see sn_proto_wasm_renderer
   // memory). Mirrors renderer/character.js's curveRadius handling.
+  // headAnchor: same "last Circle/ring drawn wins" trick as character.js, so the preview's
+  // face/accessory land in the same spot the real renderer would put them.
+  let headAnchor = null;
   const consumed = new Set();
   for (let i = 0; i < bones.length; i++) {
     if (consumed.has(i)) continue;
@@ -91,6 +94,7 @@ function draw(ctx, canvas, figure) {
         ctx.strokeStyle = '#000';
         ctx.stroke();
       }
+      headAnchor = { x: center.x, y: center.y, r };
       continue;
     }
 
@@ -117,6 +121,13 @@ function draw(ctx, canvas, figure) {
       ctx.lineCap = 'round';
       ctx.strokeStyle = color;
       ctx.stroke();
+      const ringCenter = { x: 0, y: 0 };
+      for (const p of pts) {
+        ringCenter.x += p.x / pts.length;
+        ringCenter.y += p.y / pts.length;
+      }
+      const ringR = Math.hypot(pts[0].x - ringCenter.x, pts[0].y - ringCenter.y);
+      headAnchor = { x: ringCenter.x, y: ringCenter.y, r: ringR };
       continue;
     }
 
@@ -130,13 +141,24 @@ function draw(ctx, canvas, figure) {
     ctx.strokeStyle = color;
     ctx.stroke();
   }
+
+  if (headAnchor) {
+    if (hasFaceOn) window.FaceRenderer.drawFace(ctx, headAnchor.x, headAnchor.y, headAnchor.r, 'neutral');
+    window.FaceRenderer.drawGenderAccessory(ctx, headAnchor.x, headAnchor.y, headAnchor.r, genderVal);
+  }
 }
 
 const canvas = document.getElementById('preview');
 const ctx = canvas.getContext('2d');
 const nameInput = document.getElementById('name');
 const swatchesEl = document.getElementById('swatches');
+const colorPicker = document.getElementById('colorPicker');
 const createBtn = document.getElementById('createBtn');
+
+function hexToRgba(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255, 255];
+}
 
 // "Normal" = Red's rig (filled Circle head); "hollow" = TCO's rig (ring of curved bones, no
 // Circle node at all) - see src/customCharacters.js's buildRig() for why these can't be the same
@@ -148,12 +170,20 @@ function headModel() {
   return document.querySelector('input[name="head"]:checked').value;
 }
 
+function hasFaceChecked() {
+  return document.getElementById('hasFace').checked;
+}
+
+function genderValue() {
+  return document.querySelector('input[name="gender"]:checked').value;
+}
+
 function redraw() {
   const template = templates[headModel()];
   if (!template || !selectedColor) return;
   const figure = JSON.parse(JSON.stringify(template));
   figure.color = selectedColor;
-  draw(ctx, canvas, figure);
+  draw(ctx, canvas, figure, hasFaceChecked(), genderValue());
 }
 
 async function init() {
@@ -182,7 +212,15 @@ async function init() {
   redraw();
 }
 
+colorPicker.addEventListener('input', () => {
+  selectedColor = hexToRgba(colorPicker.value);
+  for (const el of swatchesEl.children) el.classList.remove('selected');
+  redraw();
+});
+
 document.querySelectorAll('input[name="head"]').forEach((el) => el.addEventListener('change', redraw));
+document.querySelectorAll('input[name="gender"]').forEach((el) => el.addEventListener('change', redraw));
+document.getElementById('hasFace').addEventListener('change', redraw);
 
 createBtn.addEventListener('click', () => {
   const displayName = nameInput.value.trim();
@@ -194,6 +232,8 @@ createBtn.addEventListener('click', () => {
     displayName,
     color: selectedColor,
     headModel: headModel(),
+    hasFace: hasFaceChecked(),
+    gender: genderValue(),
   });
   window.close();
 });

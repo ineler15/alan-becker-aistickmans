@@ -43,9 +43,11 @@ class CharacterOverlay(
     private val rigFigure = RigFigure.forCharacterOrNull(context, def.id)
     private val sprites = if (rigFigure == null) SpriteSet.forCharacter(context, def.id) else null
     // A custom character's own id isn't in PoseLibrary's PROFILE_BY_ID - use whichever built-in
-    // profile (Red/TCO) its rig was cloned from instead, so it actually animates. Null (built-in
-    // character) falls back to def.id, same as before this existed.
-    private val poseId = Prefs.poseProfileFor(context, def.id) ?: def.id
+    // profile (Red/TCO) its rig was cloned from instead, so it actually animates. hasFace/gender
+    // drive RigView's face+accessory drawing. null (built-in character) means no face, no
+    // accessory, own id for poses - same as before any of this existed.
+    private val customMeta = Prefs.customMeta(context, def.id)
+    private val poseId = customMeta?.poseProfile ?: def.id
     private val density = context.resources.displayMetrics.density
     val sizePx = (128 * density).toInt()
     private val floorY = screenHeightPx - (48 * density).toInt()
@@ -55,7 +57,9 @@ class CharacterOverlay(
     var lastSayText: String? = null
         private set
 
-    private val rigView: RigView? = rigFigure?.let { RigView(context, it) }
+    private val rigView: RigView? = rigFigure?.let {
+        RigView(context, it, hasFace = customMeta?.hasFace ?: false, gender = customMeta?.gender ?: "otro")
+    }
     private val characterView: View = rigView ?: ImageView(context).apply { setImageBitmap(sprites!!.stand) }
     private val speechView = TextView(context).apply {
         setBackgroundColor(Color.parseColor("#EEFFFFFF"))
@@ -128,6 +132,7 @@ class CharacterOverlay(
         val kind = state.tick()
         if (rigView != null) {
             rigView.pose = PoseLibrary.forFrameKind(kind, poseId)
+            rigView.faceEmotion = state.faceEmotion
         } else {
             val bitmap = when (kind) {
                 is CharacterState.FrameKind.Stand -> sprites!!.stand

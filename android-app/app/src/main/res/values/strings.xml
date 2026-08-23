@@ -13,9 +13,15 @@
     <string name="create_character">Crear mi stickman</string>
     <string name="create_character_name_hint">Como se va a llamar</string>
     <string name="create_character_color">Color</string>
+    <string name="create_character_color_advanced">Elegir cualquier color (rojo/verde/azul)</string>
     <string name="create_character_head">Modelo de cabeza</string>
     <string name="create_character_head_normal">Normal</string>
     <string name="create_character_head_hollow">Hueca</string>
     <string name="create_character_submit">Crear stickman</string>
     <string name="create_character_name_required">Poné un nombre primero</string>
+    <string name="create_character_has_face">Tiene cara</string>
+    <string name="create_character_gender">Genero</string>
+    <string name="create_character_gender_masculino">Masculino</string>
+    <string name="create_character_gender_femenino">Femenino</string>
+    <string name="create_character_gender_otro">Otro</string>
 </resources>

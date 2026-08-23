@@ -14,9 +14,22 @@ import android.view.View
  * (poseOverride = emptyMap) so the character doesn't visibly grow/shrink switching between poses
  * of different heights (e.g. standing vs sitting) - only translation follows the current pose.
  */
-class RigView(context: Context, private val figure: RigFigure) : View(context) {
+class RigView(
+    context: Context,
+    private val figure: RigFigure,
+    private val hasFace: Boolean = false,
+    private val gender: String = "otro",
+) : View(context) {
 
     var pose: Pose = emptyMap()
+        set(value) {
+            field = value
+            invalidate()
+        }
+
+    // Independent of `pose` (body) - see CharacterState.kt's faceEmotion. Only ever meaningful
+    // when hasFace is true; harmless to set otherwise.
+    var faceEmotion: String = "neutral"
         set(value) {
             field = value
             invalidate()
@@ -59,6 +72,13 @@ class RigView(context: Context, private val figure: RigFigure) : View(context) {
         // instead of separately - see sn_proto_wasm_renderer memory for why per-segment bowing
         // looked worse (a "flower of petals": every segment's own round line-cap still bulged at
         // its joint on top of the added curve).
+        // Head is always the deepest/last-drawn thing in the tree for both rig templates (see
+        // src/customCharacters.js on the desktop side) - capturing whichever is drawn LAST here
+        // instead of adding separate head-detection logic means the face/accessory always land in
+        // the right place for either the Circle head (normal) or the ring head (hollow).
+        var headCenter: PointF? = null
+        var headRadius = 0f
+
         var i = 0
         while (i < bones.size) {
             val bone = bones[i]
@@ -74,6 +94,8 @@ class RigView(context: Context, private val figure: RigFigure) : View(context) {
                     outlinePaint.color = bone.outlineColor
                     canvas.drawCircle(center.x, center.y, r, outlinePaint)
                 }
+                headCenter = center
+                headRadius = r
                 i++
                 continue
             }
@@ -104,6 +126,14 @@ class RigView(context: Context, private val figure: RigFigure) : View(context) {
                 strokePaint.strokeWidth = (bone.thickness * scale).coerceAtLeast(1f)
                 strokePaint.color = bone.color
                 canvas.drawPath(path, strokePaint)
+                var cx = 0f
+                var cy = 0f
+                for (p in pts) {
+                    cx += p.x / pts.size
+                    cy += p.y / pts.size
+                }
+                headCenter = PointF(cx, cy)
+                headRadius = kotlin.math.hypot((pts[0].x - cx).toDouble(), (pts[0].y - cy).toDouble()).toFloat()
                 i = j
                 continue
             }
@@ -114,6 +144,11 @@ class RigView(context: Context, private val figure: RigFigure) : View(context) {
             strokePaint.color = bone.color
             canvas.drawLine(s.x, s.y, e.x, e.y, strokePaint)
             i++
+        }
+
+        headCenter?.let { center ->
+            if (hasFace) FaceRenderer.drawFace(canvas, center.x, center.y, headRadius, faceEmotion)
+            FaceRenderer.drawGenderAccessory(canvas, center.x, center.y, headRadius, gender)
         }
     }
 }

@@ -75,8 +75,13 @@ function createWindow(character, startX, startY, size) {
     if (rigPath) query.customRigUrl = pathToFileURL(rigPath).href;
     // poseLibrary.js's PROFILE_BY_ID only knows built-in ids - point it at whichever one this
     // custom character's rig was cloned from so it actually animates instead of standing frozen.
-    const poseProfile = customCharacters.poseProfileFor(character.id);
-    if (poseProfile) query.poseProfile = poseProfile;
+    // hasFace/gender drive the face+accessory drawing in character.js (see customCharacters.js).
+    const meta = customCharacters.metaFor(character.id);
+    if (meta) {
+      query.poseProfile = meta.poseProfile;
+      if (meta.hasFace) query.hasFace = '1';
+      query.gender = meta.gender;
+    }
   }
   win.loadFile(path.join(__dirname, '..', '..', 'renderer', 'character.html'), { query });
   return win;
@@ -149,6 +154,7 @@ function tick() {
       descriptor,
       lookRight: entry.state.lookRight,
       speechText: entry.state.speechText,
+      faceEmotion: entry.state.faceEmotion,
     });
   }
 }

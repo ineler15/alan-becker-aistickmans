@@ -52,9 +52,9 @@ class OverlayService : LifecycleService() {
     private var pcPeersCache: PcPeersResult = PcPeersResult(0, emptyList())
     private val turnsSinceSay = HashMap<String, Int>()
     // Anti-repetition: mirrors PC's agentLoop.js lastToolById/repeatStreakById - if the AI picks
-    // the same tool 3 times in a row (e.g. stuck spamming set_animation or say), force a move
-    // instead so it doesn't look frozen/repetitive. walk_to/move_random are exempt since actually
-    // moving repeatedly is fine.
+    // the same tool 3 times in a row (e.g. stuck spamming set_animation or say), force a wait
+    // instead so it doesn't look repetitive. walk_to is exempt since actually moving repeatedly
+    // is fine.
     private val lastToolById = HashMap<String, String>()
     private val repeatStreakById = HashMap<String, Int>()
     private val serviceScope = CoroutineScope(Dispatchers.Default + Job())
@@ -196,11 +196,21 @@ class OverlayService : LifecycleService() {
             PeerInfo(it.id, it.displayName, null, it.lastSay, device = "pc")
         }
 
+        // Fixed fact from character creation (see Prefs.CustomCharacterMeta), not something the
+        // AI defines itself via define_personality - prepended so it's part of whatever
+        // GeminiClient.decide sends as personality context.
+        val gender = Prefs.customMeta(this, characterId)?.gender
+        val genderLine = when (gender) {
+            "femenino" -> "Tu genero es femenino. "
+            "masculino" -> "Tu genero es masculino. "
+            else -> ""
+        }
+
         try {
             val decision = GeminiClient.decide(
                 apiKey = apiKey,
                 provider = Prefs.providerFor(this, characterId),
-                personality = Prefs.personality(this, characterId),
+                personality = genderLine + Prefs.personality(this, characterId),
                 recentHistory = overlay.recentHistory.toList(),
                 memory = Prefs.memory(this, characterId),
                 xPercent = overlay.xPercent(metrics.widthPixels),
@@ -228,18 +238,20 @@ class OverlayService : LifecycleService() {
     }
 
     /**
-     * If the AI has picked the same tool 3 times in a row for this character, swaps it for
-     * move_random instead - same fix as the desktop's agentLoop.js repeat guard, so a character
-     * doesn't get stuck spamming e.g. set_animation("sit") or say() forever.
+     * If the AI has picked the same tool 3 times in a row for this character, swaps it for wait
+     * instead - same fix as the desktop's agentLoop.js repeat guard, so a character doesn't get
+     * stuck spamming e.g. set_animation("sit") or say() forever. Doesn't need to force it into
+     * moving somewhere visible - CharacterState's own autonomous wander (IDLE_WALK_TIMEOUT_MS)
+     * already takes over on its own if it stays idle long enough either way.
      */
     private fun dedupeRepeatedAction(characterId: String, tool: String, args: JSONObject): Pair<String, JSONObject> {
         val streak = if (tool == lastToolById[characterId]) (repeatStreakById[characterId] ?: 0) + 1 else 0
         lastToolById[characterId] = tool
         repeatStreakById[characterId] = streak
-        if (streak >= 3 && tool != "move_random" && tool != "walk_to") {
+        if (streak >= 3 && tool != "walk_to") {
             repeatStreakById[characterId] = 0
-            lastToolById[characterId] = "move_random"
-            return "move_random" to JSONObject()
+            lastToolById[characterId] = "wait"
+            return "wait" to JSONObject()
         }
         return tool to args
     }
@@ -251,12 +263,12 @@ class OverlayService : LifecycleService() {
                 val xPct = args.optDouble("x", 50.0).coerceIn(0.0, 100.0)
                 overlay.state.startMoving((xPct / 100 * metrics.widthPixels).toInt(), args.optBoolean("run", false))
             }
-            "move_random" -> overlay.state.randomTarget(args.optBoolean("run", false))
             "set_animation" -> {
                 val state = args.optString("state", "idle")
                 val validStates = setOf("happy", "trip", "sad", "scared", "sit", "tired", "sleep")
                 overlay.state.setEmotion(if (state in validStates) state else null)
             }
+            "set_emotion" -> overlay.state.setFaceEmotion(args.optString("emotion").takeIf { it.isNotBlank() })
             "say" -> {
                 val text = args.optString("text", "")
                 overlay.say(text)
@@ -271,7 +283,11 @@ class OverlayService : LifecycleService() {
                     val keyframes = (0 until keyframesJson.length()).map { i ->
                         val kf = keyframesJson.getJSONObject(i)
                         val angles = bodyParts.filter { kf.has(it) }.associateWith { kf.optDouble(it).toFloat() }
-                        CharacterState.Keyframe(angles, kf.optLong("holdMs", CharacterState.DEFAULT_KEYFRAME_HOLD_MS))
+                        CharacterState.Keyframe(
+                            angles,
+                            kf.optLong("holdMs", CharacterState.DEFAULT_KEYFRAME_HOLD_MS),
+                            face = if (kf.has("face")) kf.optString("face") else null,
+                        )
                     }
                     overlay.state.startCustomAnimation(keyframes)
                 }

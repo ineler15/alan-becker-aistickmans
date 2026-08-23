@@ -13,6 +13,11 @@ const characterId = params.get('id');
 // resolves which built-in profile its rig was cloned from (Red/TCO) and passes it here so it
 // actually animates. Absent for built-in characters, which just use their own id as before.
 const poseId = params.get('poseProfile') || characterId;
+// Face/gender accessory - only ever set for custom characters (see customCharacters.js's
+// metaFor()); built-in characters get neither, same as before this existed.
+const hasFace = params.get('hasFace') === '1';
+const gender = params.get('gender') || 'otro';
+let currentFaceEmotion = 'neutral';
 // The rig's own visual box (jsCharacterEngine.js's RIG_WIDTH/RIG_HEIGHT) - kept separate from the
 // actual (larger) window size, which pads out extra room for the speech bubble. Falls back to the
 // window's own size if launched without these (e.g. the older standalone rig-test page).
@@ -128,6 +133,13 @@ function draw() {
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+  // The head is always the deepest/last-drawn thing in the tree in both rig templates (see
+  // customCharacters.js) - a plain Circle/FilledCircle node for the "normal" model, or the final
+  // curveRadius ring chain for the "hollow" one. Capturing whichever is drawn LAST instead of
+  // adding separate head-detection logic means the face/accessory always lands in the right
+  // place for either template with no extra bookkeeping.
+  let headAnchor = null;
+
   const consumed = new Set();
   for (let i = 0; i < bones.length; i++) {
     if (consumed.has(i)) continue;
@@ -150,6 +162,7 @@ function draw() {
         ctx.strokeStyle = node.oc ? colorCss(node.oc) : '#000';
         ctx.stroke();
       }
+      headAnchor = { x: center.x, y: center.y, r };
       continue;
     }
 
@@ -176,6 +189,13 @@ function draw() {
       ctx.lineCap = 'round';
       ctx.strokeStyle = color;
       ctx.stroke();
+      const ringCenter = { x: 0, y: 0 };
+      for (const p of pts) {
+        ringCenter.x += p.x / pts.length;
+        ringCenter.y += p.y / pts.length;
+      }
+      const ringR = Math.hypot(pts[0].x - ringCenter.x, pts[0].y - ringCenter.y);
+      headAnchor = { x: ringCenter.x, y: ringCenter.y, r: ringR };
       continue;
     }
 
@@ -189,11 +209,17 @@ function draw() {
     ctx.strokeStyle = color;
     ctx.stroke();
   }
+
+  if (headAnchor) {
+    if (hasFace) window.FaceRenderer.drawFace(ctx, headAnchor.x, headAnchor.y, headAnchor.r, currentFaceEmotion);
+    window.FaceRenderer.drawGenderAccessory(ctx, headAnchor.x, headAnchor.y, headAnchor.r, gender);
+  }
 }
 
 ipcRenderer.on('character:pose', (_event, payload) => {
   if (payload.id !== characterId) return;
   currentPose = window.PoseLibrary.forDescriptor(payload.descriptor, poseId);
+  if (payload.faceEmotion) currentFaceEmotion = payload.faceEmotion;
   if (payload.lookRight !== undefined) lookRight = payload.lookRight;
   canvas.style.transform = lookRight ? 'scaleX(-1)' : 'none';
   if (payload.speechText) {

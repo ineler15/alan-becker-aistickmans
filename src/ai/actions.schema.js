@@ -24,12 +24,6 @@ const ACTIONS = [
     risky: false,
   },
   {
-    name: 'move_random',
-    desc: 'El stickman camina (o corre, si run=true) a un punto aleatorio de la pantalla, para no quedarse quieto',
-    params: { run: 'boolean (opcional) - true = corre en vez de caminar' },
-    risky: false,
-  },
-  {
     name: 'ride_mouse',
     desc:
       'El stickman se sube y viaja montado sobre el cursor del mouse del usuario durante unos segundos, ' +
@@ -109,13 +103,25 @@ const ACTIONS = [
   {
     name: 'set_animation',
     desc:
-      'Cambia la pose/emocion del stickman (no tiene cara, expresa todo con el cuerpo). ' +
+      'Cambia la pose del cuerpo del stickman. ' +
       'happy=salta contento, dance=baila, trip=se tropieza/queda confundido, scared=corre asustado, ' +
-      'sad=se cae, tired=se tira en un sillon, sleep=se acuesta, jump=salta, sit=se sienta.',
+      'sad=se cae, tired=se tira en un sillon, sleep=se acuesta, jump=salta, sit=se sienta. Esto es ' +
+      'solo el cuerpo - si tenes cara propia, usa ademas set_emotion para la expresion facial (son ' +
+      'independientes entre si, podes estar sentado y feliz al mismo tiempo).',
     params: {
       state: 'string (idle|walk|think|talk|point|wave|jump|sit|sleep|tired|happy|dance|trip|scared|sad)',
       caption: 'string (opcional)',
     },
+    risky: false,
+  },
+  {
+    name: 'set_emotion',
+    desc:
+      'Cambia la expresion de tu cara (ojos y boca) - independiente de la pose del cuerpo ' +
+      '(set_animation/set_custom_animation), asi que podes combinarla con cualquier pose. Solo se ' +
+      'nota si tenes cara propia (se eligio al crearte) - si no tenes, esta accion simplemente no ' +
+      'hace nada visible.',
+    params: { emotion: 'string (neutral|happy|sad|angry|surprised|love)' },
     risky: false,
   },
   {
@@ -124,12 +130,15 @@ const ACTIONS = [
       'En vez de una pose fija de set_animation, crea tu propia animacion: una secuencia de hasta 12 ' +
       'posturas (keyframes) que se van a reproducir en orden, cada una mantenida un ratito (holdMs) antes ' +
       'de pasar a la siguiente. Cada keyframe es un angulo (en grados) para las partes del cuerpo que ' +
-      'quieras mover ese paso - las que no incluyas se quedan como estaban. Usalo para gestos o bailes ' +
-      'unicos que no encajan en ninguna pose predefinida.',
+      'quieras mover ese paso - las que no incluyas se quedan como estaban. Si tenes cara propia, cada ' +
+      'keyframe tambien puede traer su propia expresion facial (face) - si un keyframe no la trae, se ' +
+      'mantiene la ultima que se uso. Usalo para gestos o bailes unicos que no encajan en ninguna pose ' +
+      'predefinida.',
     params: {
       keyframes:
         'array de objetos (JSON string o array) - cada uno con angulos opcionales para ' +
-        'torso/leg1/leg1Shin/leg2/leg2Shin/arm1/arm2 (numeros, grados) y holdMs opcional (100-3000, default 400)',
+        'torso/leg1/leg1Shin/leg2/leg2Shin/arm1/arm2 (numeros, grados), face opcional ' +
+        '(string: neutral|happy|sad|angry|surprised|love) y holdMs opcional (100-3000, default 400)',
     },
     risky: false,
   },

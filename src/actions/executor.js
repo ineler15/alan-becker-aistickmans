@@ -28,9 +28,6 @@ async function execute(name, args, characterId) {
     case 'walk_to':
       shimeji.sendCommand(characterId, 'walk_to', { x: args.x, y: args.y, run: args.run });
       return { ok: true, result: `orden enviada: ${args.run ? 'correr' : 'caminar'} a (${args.x}, ${args.y})` };
-    case 'move_random':
-      shimeji.sendCommand(characterId, 'move_random', { run: args.run });
-      return { ok: true, result: `orden enviada: ${args.run ? 'correr' : 'caminar'} a un punto aleatorio` };
     case 'ride_mouse':
       shimeji.sendCommand(characterId, 'ride_mouse', { seconds: args.seconds });
       return { ok: true, result: 'orden enviada: subirse al cursor del mouse' };
@@ -83,6 +80,9 @@ async function execute(name, args, characterId) {
     case 'set_animation':
       shimeji.sendCommand(characterId, 'set_animation', { state: args.state, caption: args.caption });
       return { ok: true, result: 'animacion actualizada' };
+    case 'set_emotion':
+      shimeji.sendCommand(characterId, 'set_emotion', { emotion: args.emotion });
+      return { ok: true, result: 'emocion actualizada' };
     case 'say':
       shimeji.sendCommand(characterId, 'say', { text: args.text });
       return { ok: true, result: 'mensaje mostrado' };

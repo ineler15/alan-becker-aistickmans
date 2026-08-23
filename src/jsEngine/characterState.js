@@ -27,6 +27,9 @@ const DEFAULT_KEYFRAME_HOLD_MS = 400;
 // Autonomous wander: if nothing (AI decision or drag) has moved this character in a while, walk
 // somewhere on its own instead of just idling in place.
 const IDLE_WALK_TIMEOUT_MS = 6000;
+// Same vocabulary as renderer/face.js's FaceRenderer.EMOTIONS - duplicated rather than shared
+// since this file runs in the main process (no `window`) and that one in the renderer.
+const FACE_EMOTIONS = ['neutral', 'happy', 'sad', 'angry', 'surprised', 'love'];
 
 class CharacterState {
   constructor(screenWidth, screenHeight, floorY) {
@@ -60,6 +63,11 @@ class CharacterState {
     this.loopEmotion = null;
     this.sayUntil = 0;
     this.speechText = null;
+    // Facial expression only - fully independent of loopEmotion/customAnimation/moving/falling
+    // (those are body pose), so a character can be e.g. walking and happy at the same time. Only
+    // ever visible on a character built with hasFace (see customCharacters.js) - a no-op
+    // otherwise, same as this project's other "swallowed" actions.
+    this.faceEmotion = 'neutral';
   }
 
   startMoving(targetX, run) {
@@ -97,11 +105,21 @@ class CharacterState {
     if (this.sleeping) this._wakeUp();
     this.customAnimation = keyframes.slice(0, MAX_CUSTOM_KEYFRAMES).map((k) => ({
       angles: k.angles || {},
+      face: FACE_EMOTIONS.includes(k.face) ? k.face : null,
       holdMs: Math.min(MAX_KEYFRAME_HOLD_MS, Math.max(MIN_KEYFRAME_HOLD_MS, k.holdMs || DEFAULT_KEYFRAME_HOLD_MS)),
     }));
     this.customIndex = 0;
     this.customKeyframeStartedAt = Date.now();
     this.customAccumulatedAngles = {};
+    // Keyframes that don't specify a face keep whatever the previous one set (or the character's
+    // standing faceEmotion if none in the sequence has set one yet) - only applying a keyframe's
+    // own face when it actually has one.
+    if (this.customAnimation[0].face) this.faceEmotion = this.customAnimation[0].face;
+  }
+
+  setFaceEmotion(emotion) {
+    this.lastActiveAt = Date.now();
+    this.faceEmotion = FACE_EMOTIONS.includes(emotion) ? emotion : 'neutral';
   }
 
   setEmotion(state) {
@@ -191,6 +209,11 @@ class CharacterState {
         Object.assign(this.customAccumulatedAngles, kf[this.customIndex].angles);
         this.customIndex++;
         this.customKeyframeStartedAt = Date.now();
+        // A keyframe without its own `face` keeps whatever the previous one set instead of
+        // resetting to neutral - only overwrite when this keyframe actually specifies one.
+        if (this.customIndex < kf.length && kf[this.customIndex].face) {
+          this.faceEmotion = kf[this.customIndex].face;
+        }
       }
       if (this.customIndex >= kf.length) {
         this.customAnimation = null;

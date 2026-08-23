@@ -100,10 +100,23 @@
       <div class="col">
         <label>Color</label>
         <div id="swatches"></div>
+        <div style="display: flex; align-items: center; gap: 8px; margin-top: 6px">
+          <input type="color" id="colorPicker" value="#ff0000" style="width: 40px; height: 28px; padding: 0; border: none; background: none; cursor: pointer" />
+          <span style="font-size: 12px; color: #aaa">Elegir cualquier color</span>
+        </div>
         <label>Modelo de cabeza</label>
         <div class="head-options">
           <label><input type="radio" name="head" value="normal" checked /> Normal</label>
           <label><input type="radio" name="head" value="hollow" /> Hueca</label>
+        </div>
+        <label class="head-options" style="margin-top: 8px">
+          <input type="checkbox" id="hasFace" /> Tiene cara
+        </label>
+        <label>Genero</label>
+        <div class="head-options">
+          <label><input type="radio" name="gender" value="masculino" /> Masculino</label>
+          <label><input type="radio" name="gender" value="femenino" /> Femenino</label>
+          <label><input type="radio" name="gender" value="otro" checked /> Otro</label>
         </div>
       </div>
       <div class="col">
@@ -111,6 +124,7 @@
       </div>
     </div>
     <button id="createBtn">Crear stickman</button>
+    <script src="face.js"></script>
     <script src="createCharacter.js"></script>
   </body>
 </html>

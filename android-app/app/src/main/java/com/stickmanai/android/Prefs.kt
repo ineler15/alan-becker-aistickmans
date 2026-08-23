@@ -95,8 +95,15 @@ object Prefs {
 
     // Sanitizes displayName into an id (letters/digits only, deduped against every existing
     // builtin + custom id) and appends it - mirrors src/customCharacters.js's sanitizeId on PC.
-    // headModel ("normal"/"hollow") is stored alongside so poseProfileFor() below can find it later.
-    fun addCustomCharacter(context: Context, displayName: String, headModel: String): CharacterDef {
+    // headModel ("normal"/"hollow"), hasFace and gender ("masculino"/"femenino"/"otro") are stored
+    // alongside so customMeta() below can find them later.
+    fun addCustomCharacter(
+        context: Context,
+        displayName: String,
+        headModel: String,
+        hasFace: Boolean,
+        gender: String,
+    ): CharacterDef {
         val base = displayName.filter { it.isLetterOrDigit() }.ifBlank { "Stickman" }
         val existingIds = allCharacters(context).map { it.id }.toSet()
         var id = base
@@ -113,22 +120,34 @@ object Prefs {
         entry.put("id", def.id)
         entry.put("displayName", def.displayName)
         entry.put("headModel", headModel)
+        entry.put("hasFace", hasFace)
+        entry.put("gender", gender)
         array.put(entry)
         sp(context).edit().putString("custom_characters", array.toString()).apply()
         return def
     }
 
+    /** poseProfile is PoseLibrary's PROFILE_BY_ID key (built-ins don't need one - the caller keeps using its own id). */
+    data class CustomCharacterMeta(val poseProfile: String, val hasFace: Boolean, val gender: String)
+
     // PoseLibrary's PROFILE_BY_ID only knows built-in ids - a custom character's rig is always an
     // exact clone of Red's (headModel "normal") or TCO's (headModel "hollow") rig, so pointing
     // PoseLibrary at that id instead of the custom one is enough to fully animate it. Null for a
-    // built-in character (or an unknown id), so callers keep using the character's own id then.
-    fun poseProfileFor(context: Context, characterId: String): String? {
+    // built-in character (or an unknown id) - callers should keep using the character's own
+    // id/no face/no accessory in that case. Consolidates what used to be a separate
+    // poseProfileFor() - one JSON scan instead of one per field.
+    fun customMeta(context: Context, characterId: String): CustomCharacterMeta? {
         val raw = sp(context).getString("custom_characters", "[]") ?: "[]"
         val array = JSONArray(raw)
         for (i in 0 until array.length()) {
             val obj = array.getJSONObject(i)
             if (obj.getString("id") == characterId) {
-                return if (obj.optString("headModel") == "hollow") "TCO" else "Red"
+                val poseProfile = if (obj.optString("headModel") == "hollow") "TCO" else "Red"
+                return CustomCharacterMeta(
+                    poseProfile = poseProfile,
+                    hasFace = obj.optBoolean("hasFace", false),
+                    gender = obj.optString("gender", "otro"),
+                )
             }
         }
         return null

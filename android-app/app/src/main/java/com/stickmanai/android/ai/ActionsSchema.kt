@@ -43,20 +43,29 @@ object ActionsSchema {
         )
         put(
             tool(
-                "move_random",
-                "Camina a un punto al azar de la pantalla. Usar solo si no hay nada puntual a donde ir.",
-                JSONObject().put("run", prop("boolean", "true para correr en vez de caminar"))
-            )
-        )
-        put(
-            tool(
                 "set_animation",
-                "Expresa una emocion con el cuerpo (no tenes cara). tired = te tiras cansado, sleep = te acostas a dormir (dejas de recibir turnos hasta que te despierten o pase un rato).",
+                "Cambia la pose de tu cuerpo. tired = te tiras cansado, sleep = te acostas a dormir " +
+                    "(dejas de recibir turnos hasta que te despierten o pase un rato). Esto es solo el " +
+                    "cuerpo - si tenes cara propia, usa ademas set_emotion para la expresion facial (son " +
+                    "independientes, podes estar sentado y feliz al mismo tiempo).",
                 JSONObject().put(
                     "state",
                     prop("string", "Estado emocional", listOf("idle", "happy", "trip", "sad", "scared", "sit", "angry", "tired", "sleep"))
                 ),
                 listOf("state")
+            )
+        )
+        put(
+            tool(
+                "set_emotion",
+                "Cambia la expresion de tu cara (ojos y boca) - independiente de la pose del cuerpo " +
+                    "(set_animation/set_custom_animation). Solo se nota si tenes cara propia (se eligio " +
+                    "al crearte) - si no tenes, esta accion simplemente no hace nada visible.",
+                JSONObject().put(
+                    "emotion",
+                    prop("string", "Expresion facial", listOf("neutral", "happy", "sad", "angry", "surprised", "love"))
+                ),
+                listOf("emotion")
             )
         )
         put(
@@ -99,9 +108,11 @@ object ActionsSchema {
                 "Armate tu propia mini-animacion (unica, no una de las poses fijas) moviendo tu cuerpo " +
                     "cuadro por cuadro. Cada cuadro es un angulo en grados para las partes que quieras " +
                     "mover (torso, leg1, leg1Shin, leg2, leg2Shin, arm1, arm2) - la parte que no " +
-                    "menciones se queda como estaba en el cuadro anterior. Usalo cuando ninguna emocion " +
-                    "fija (set_animation) representa lo que queres expresar. Solo funciona para vos si " +
-                    "tu cuerpo es de los que soportan pose completa (no todos la tienen todavia) - si no " +
+                    "menciones se queda como estaba en el cuadro anterior. Si tenes cara propia, cada " +
+                    "cuadro tambien puede traer su propia expresion facial (face) - si un cuadro no la " +
+                    "trae, se mantiene la ultima que se uso. Usalo cuando ninguna emocion fija " +
+                    "(set_animation) representa lo que queres expresar. Solo funciona para vos si tu " +
+                    "cuerpo es de los que soportan pose completa (no todos la tienen todavia) - si no " +
                     "pasa nada, no insistas turno tras turno.",
                 JSONObject().put(
                     "keyframes",
@@ -118,6 +129,10 @@ object ActionsSchema {
                                         for (part in listOf("torso", "leg1", "leg1Shin", "leg2", "leg2Shin", "arm1", "arm2")) {
                                             put(part, prop("number", "Angulo en grados para $part (opcional)"))
                                         }
+                                        put(
+                                            "face",
+                                            prop("string", "Expresion facial para este cuadro (opcional)", listOf("neutral", "happy", "sad", "angry", "surprised", "love"))
+                                        )
                                         put("holdMs", prop("number", "Cuanto dura este cuadro en milisegundos (100-3000, default 400)"))
                                     }
                                 )

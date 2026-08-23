@@ -40,6 +40,9 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
         // configured API key (see Prefs.apiKeyFor) never gets an AI decision at all, so without
         // this it would otherwise stand there forever.
         const val IDLE_WALK_TIMEOUT_MS = 6000L
+        // Same vocabulary as FaceRenderer.EMOTIONS - duplicated since that one lives in the view
+        // layer and this is a plain state class with no Android view dependency.
+        val FACE_EMOTIONS = listOf("neutral", "happy", "sad", "angry", "surprised", "love")
     }
 
     /**
@@ -49,7 +52,7 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
      * (or the rig's own rest angle, if no earlier keyframe set it either) rather than snapping
      * back to rest every frame - see CharacterState.tick()'s customAnimation handling.
      */
-    data class Keyframe(val angles: Map<String, Float>, val holdMs: Long)
+    data class Keyframe(val angles: Map<String, Float>, val holdMs: Long, val face: String? = null)
 
     var x: Int = screenWidth / 2
     var y: Int = floorY
@@ -88,6 +91,13 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
     var sayUntil = 0L
         private set
     var speechText: String? = null
+        private set
+
+    // Facial expression only - fully independent of loopEmotion/customAnimation/moving/falling
+    // (those are body pose), so a character can be e.g. walking and happy at the same time. Only
+    // ever visible on a character built with hasFace (see Prefs.CustomCharacterMeta) - a no-op
+    // otherwise, same as this project's other "swallowed" actions.
+    var faceEmotion: String = "neutral"
         private set
 
     fun startMoving(targetX: Int, run: Boolean) {
@@ -139,11 +149,23 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
         loopEmotion = null
         if (sleeping) wakeUp()
         customAnimation = keyframes.take(MAX_CUSTOM_KEYFRAMES).map {
-            it.copy(holdMs = it.holdMs.coerceIn(MIN_KEYFRAME_HOLD_MS, MAX_KEYFRAME_HOLD_MS))
+            it.copy(
+                holdMs = it.holdMs.coerceIn(MIN_KEYFRAME_HOLD_MS, MAX_KEYFRAME_HOLD_MS),
+                face = it.face.takeIf { f -> FACE_EMOTIONS.contains(f) },
+            )
         }
         customIndex = 0
         customKeyframeStartedAt = System.currentTimeMillis()
         customAccumulatedAngles = mutableMapOf()
+        // A keyframe without its own face keeps whatever the previous one set (or the character's
+        // standing faceEmotion if none in the sequence has set one yet) - only applying a
+        // keyframe's own face when it actually has one.
+        customAnimation!!.first().face?.let { faceEmotion = it }
+    }
+
+    fun setFaceEmotion(emotion: String?) {
+        lastActiveAt = System.currentTimeMillis()
+        faceEmotion = if (FACE_EMOTIONS.contains(emotion)) emotion!! else "neutral"
     }
 
     fun setEmotion(state: String?) {
@@ -232,6 +254,9 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
                 customAccumulatedAngles.putAll(keyframes[customIndex].angles)
                 customIndex++
                 customKeyframeStartedAt = System.currentTimeMillis()
+                // A keyframe without its own face keeps whatever the previous one set instead of
+                // resetting to neutral - only overwrite when this keyframe actually specifies one.
+                if (customIndex < keyframes.size) keyframes[customIndex].face?.let { faceEmotion = it }
             }
             if (customIndex >= keyframes.size) {
                 customAnimation = null
