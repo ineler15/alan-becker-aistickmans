@@ -20,6 +20,11 @@ function load() {
       // Per-character provider override ('' / absent = use the shared `provider` above),
       // mirrors Android's per-node provider Spinner (Prefs.kt's providerFor/setProviderFor).
       perCharacterProvider: {},
+      // Explicit "pareja" - a character id this one has a designated partner/love interest in,
+      // surfaced to the AI as a strong personality fact (see applyPartners() below) rather than
+      // left to the emergent/optional "crush" behavior in the system prompts. One-directional -
+      // set it on both characters for a mutual relationship.
+      perCharacterPartner: {},
       // No settings file yet (first run) - default to the same subset that used to be
       // hardcoded in characters.js, so behavior is unchanged until the user touches a checkbox.
       enabledIds: CHARACTERS.map((c) => c.id),
@@ -39,6 +44,15 @@ function applyEnabledCharacters(settings) {
   const chosen = enabledIds.map((id) => CHARACTERS.ALL.find((c) => c.id === id)).filter(Boolean);
   CHARACTERS.length = 0;
   CHARACTERS.push(...chosen);
+}
+
+// Stamps each character's designated partner (if any) onto its CHARACTERS.ALL entry, same
+// "mutate in place, every module sees it live" pattern as the rest of this file - agentLoop.js
+// reads character.partnerId to build the personality line.
+function applyPartners(settings) {
+  for (const character of CHARACTERS.ALL) {
+    character.partnerId = (settings.perCharacterPartner || {})[character.id] || null;
+  }
 }
 
 function save(settings) {
@@ -87,5 +101,6 @@ module.exports = {
   save,
   applyToEnv,
   applyEnabledCharacters,
+  applyPartners,
   SETTINGS_PATH,
 };

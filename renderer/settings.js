@@ -4,6 +4,7 @@
 let keyInputs = {};
 let providerSelects = {};
 let checkboxes = {};
+let partnerSelects = {};
 
 async function renderCharacterList(providers) {
   const { characters, settings } = await window.stickmanAPI.getPcSettings();
@@ -12,8 +13,10 @@ async function renderCharacterList(providers) {
   keyInputs = {};
   providerSelects = {};
   checkboxes = {};
+  partnerSelects = {};
   const enabledIds = new Set(settings.enabledIds || []);
   const perCharacterProvider = settings.perCharacterProvider || {};
+  const perCharacterPartner = settings.perCharacterPartner || {};
   for (const c of characters) {
     const row = document.createElement('div');
     row.className = 'char-row';
@@ -47,10 +50,27 @@ async function renderCharacterList(providers) {
     input.value = (settings.perCharacterKeys || {})[c.id] || '';
     keyInputs[c.id] = input;
 
+    const partnerSelect = document.createElement('select');
+    const noPartnerOpt = document.createElement('option');
+    noPartnerOpt.value = '';
+    noPartnerOpt.textContent = '(sin pareja)';
+    partnerSelect.appendChild(noPartnerOpt);
+    for (const other of characters) {
+      if (other.id === c.id) continue;
+      const opt = document.createElement('option');
+      opt.value = other.id;
+      opt.textContent = other.displayName;
+      partnerSelect.appendChild(opt);
+    }
+    partnerSelect.value = perCharacterPartner[c.id] || '';
+    partnerSelect.title = 'Pareja - configuralo en ambos personajes para que sea mutuo';
+    partnerSelects[c.id] = partnerSelect;
+
     row.appendChild(checkbox);
     row.appendChild(label);
     row.appendChild(charProviderSelect);
     row.appendChild(input);
+    row.appendChild(partnerSelect);
     charList.appendChild(row);
   }
 }
@@ -83,12 +103,15 @@ async function init() {
     for (const id in keyInputs) perCharacterKeys[id] = keyInputs[id].value.trim();
     const perCharacterProviderOut = {};
     for (const id in providerSelects) perCharacterProviderOut[id] = providerSelects[id].value;
+    const perCharacterPartnerOut = {};
+    for (const id in partnerSelects) perCharacterPartnerOut[id] = partnerSelects[id].value;
     const enabled = Object.keys(checkboxes).filter((id) => checkboxes[id].checked);
     window.stickmanAPI.savePcSettings({
       provider: providerSelect.value,
       sharedApiKey: document.getElementById('sharedKey').value.trim(),
       perCharacterKeys,
       perCharacterProvider: perCharacterProviderOut,
+      perCharacterPartner: perCharacterPartnerOut,
       enabledIds: enabled,
       allowMouseControl: document.getElementById('allowMouseControl').checked,
     });

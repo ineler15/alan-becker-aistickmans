@@ -136,6 +136,15 @@ async function tickCharacter(character, perception, userMessageText) {
           ? 'Tu genero es masculino. '
           : '';
 
+    // Explicit "pareja" set in Settings (pcSettings.applyPartners), stronger/more reliable than
+    // the emergent "crush" behavior in the system prompts - a designated fact, not something that
+    // may or may not surface on its own.
+    const partner = character.partnerId ? CHARACTERS.ALL.find((c) => c.id === character.partnerId) : null;
+    const partnerLine = partner
+      ? `Tu pareja es ${partner.displayName}. Sentis carino especial por esa persona - buscala, ` +
+        'hablale con carino, y llevate bien con ella. '
+      : '';
+
     const context = {
       characterId,
       recentHistory: history.recent(characterId, 8),
@@ -148,6 +157,7 @@ async function tickCharacter(character, perception, userMessageText) {
       webcamBase64: webcam.get(),
       personality:
         genderLine +
+        partnerLine +
         (selfPersonality.load(characterId) ||
           character.personality ||
           'Todavia no definiste tu propia personalidad. Cuando quieras, usa define_personality para ' +

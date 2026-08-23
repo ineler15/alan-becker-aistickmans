@@ -21,6 +21,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private val apiKeyFields = HashMap<String, EditText>()
     private val providerFields = HashMap<String, Spinner>()
+    private val partnerFields = HashMap<String, Spinner>()
 
     // First entry means "usar el compartido" (empty -> Prefs.providerFor falls back to shared).
     private val perCharacterProviderOptions = listOf("(compartido)") + Prefs.PROVIDERS
@@ -152,9 +153,21 @@ class MainActivity : AppCompatActivity() {
             }
             providerFields[character.id] = providerField
 
+            // Options/ids stashed on the Spinner's tag so savePrefs() can read the selection back
+            // without recomputing (and risking a mismatched order) - "(sin pareja)" is index 0.
+            val partnerIds = listOf<String?>(null) + allCharacters(this).filter { it.id != character.id }.map { it.id }
+            val partnerLabels = listOf("(sin pareja)") + allCharacters(this).filter { it.id != character.id }.map { it.displayName }
+            val partnerField = Spinner(this).apply {
+                adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, partnerLabels)
+                setSelection(partnerIds.indexOf(Prefs.partnerFor(this@MainActivity, character.id)).coerceAtLeast(0))
+                tag = partnerIds
+            }
+            partnerFields[character.id] = partnerField
+
             row.addView(checkBox)
             row.addView(providerField)
             row.addView(apiKeyField)
+            row.addView(partnerField)
             binding.characterList.addView(row)
 
             checkBox.setOnCheckedChangeListener { _, isChecked ->
@@ -173,6 +186,12 @@ class MainActivity : AppCompatActivity() {
         for ((characterId, spinner) in providerFields) {
             val selected = spinner.selectedItem as String
             Prefs.setProviderFor(this, characterId, if (selected == perCharacterProviderOptions[0]) "" else selected)
+        }
+        for ((characterId, spinner) in partnerFields) {
+            @Suppress("UNCHECKED_CAST")
+            val ids = spinner.tag as? List<String?>
+            val selectedId = ids?.getOrNull(spinner.selectedItemPosition)
+            Prefs.setPartnerFor(this, characterId, selectedId)
         }
     }
 

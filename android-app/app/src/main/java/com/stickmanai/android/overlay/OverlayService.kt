@@ -13,6 +13,7 @@ import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
 import com.stickmanai.android.MainActivity
 import com.stickmanai.android.Prefs
+import com.stickmanai.android.allCharacters
 import com.stickmanai.android.R
 import com.stickmanai.android.ai.CameraCapture
 import com.stickmanai.android.ai.GeminiClient
@@ -206,11 +207,20 @@ class OverlayService : LifecycleService() {
             else -> ""
         }
 
+        // Explicit "pareja" (see Prefs.partnerFor) - a designated fact, not the emergent crush
+        // behavior GeminiClient's own system prompt already encourages. Mirrors PC's agentLoop.js.
+        val partnerId = Prefs.partnerFor(this, characterId)
+        val partner = partnerId?.let { pid -> allCharacters(this).find { it.id == pid } }
+        val partnerLine = if (partner != null) {
+            "Tu pareja es ${partner.displayName}. Sentis carino especial por esa persona - buscala, " +
+                "hablale con carino, y llevate bien con ella. "
+        } else ""
+
         try {
             val decision = GeminiClient.decide(
                 apiKey = apiKey,
                 provider = Prefs.providerFor(this, characterId),
-                personality = genderLine + Prefs.personality(this, characterId),
+                personality = genderLine + partnerLine + Prefs.personality(this, characterId),
                 recentHistory = overlay.recentHistory.toList(),
                 memory = Prefs.memory(this, characterId),
                 xPercent = overlay.xPercent(metrics.widthPixels),

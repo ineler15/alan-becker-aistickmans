@@ -68,7 +68,10 @@ function sanitizeId(displayName) {
       .replace(/[^a-zA-Z0-9]/g, '') || 'Stickman';
   let id = base;
   let suffix = 2;
-  while (CHARACTERS.ALL.some((c) => c.id === id)) {
+  // Case-insensitive: Windows' filesystem resolves "personality-Red.json" and
+  // "personality-red.json" to the SAME file, so a custom "red" would silently share/overwrite
+  // built-in "Red"'s personality/history/memory files if both were ever enabled together.
+  while (CHARACTERS.ALL.some((c) => c.id.toLowerCase() === id.toLowerCase())) {
     id = `${base}_${suffix}`;
     suffix += 1;
   }

@@ -61,6 +61,17 @@ object Prefs {
         sp(context).edit().putString("provider_$characterId", provider).apply()
     }
 
+    // Explicit "pareja" - a character id this one has a designated partner/love interest in,
+    // stronger/more reliable than the emergent "crush" behavior in GeminiClient's system prompt -
+    // a designated fact, not something that may or may not surface on its own. One-directional -
+    // set it on both characters for a mutual relationship. Mirrors PC's perCharacterPartner.
+    fun partnerFor(context: Context, characterId: String): String? =
+        sp(context).getString("partner_$characterId", null)?.takeIf { it.isNotBlank() }
+
+    fun setPartnerFor(context: Context, characterId: String, partnerId: String?) {
+        sp(context).edit().putString("partner_$characterId", partnerId ?: "").apply()
+    }
+
     fun personality(context: Context, characterId: String): String =
         sp(context).getString("personality_$characterId", "") ?: ""
 
@@ -105,10 +116,12 @@ object Prefs {
         gender: String,
     ): CharacterDef {
         val base = displayName.filter { it.isLetterOrDigit() }.ifBlank { "Stickman" }
-        val existingIds = allCharacters(context).map { it.id }.toSet()
+        // Case-insensitive: Android's storage isn't case-sensitive either, and mirroring PC's
+        // sanitizeId keeps ids consistent between platforms (see customCharacters.js).
+        val existingIdsLower = allCharacters(context).map { it.id.lowercase() }.toSet()
         var id = base
         var suffix = 2
-        while (id in existingIds) {
+        while (id.lowercase() in existingIdsLower) {
             id = "${base}_$suffix"
             suffix += 1
         }
