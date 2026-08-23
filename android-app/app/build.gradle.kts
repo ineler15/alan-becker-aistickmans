@@ -11,8 +11,8 @@ android {
         applicationId = "com.stickmanai.android"
         minSdk = 26
         targetSdk = 36
-        versionCode = 13
-        versionName = "1.11"
+        versionCode = 14
+        versionName = "1.12"
     }
 
     buildTypes {

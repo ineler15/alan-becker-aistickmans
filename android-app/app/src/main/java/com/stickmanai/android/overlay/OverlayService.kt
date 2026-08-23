@@ -211,9 +211,20 @@ class OverlayService : LifecycleService() {
         // behavior GeminiClient's own system prompt already encourages. Mirrors PC's agentLoop.js.
         val partnerId = Prefs.partnerFor(this, characterId)
         val partner = partnerId?.let { pid -> allCharacters(this).find { it.id == pid } }
+        // Restate the partner's live position directly here instead of relying on the model to
+        // find the right entry in "peers" by name on its own - repeating it right next to "this
+        // one is your partner" is what actually makes characters go find each other. Mirrors
+        // PC's agentLoop.js.
+        val partnerPeer = partner?.let { p -> peers.find { it.id == p.id } }
+        val partnerLocationLine = when {
+            partnerPeer?.device == "pc" -> "Ahora mismo esta en la PC. "
+            partnerPeer?.x != null -> "Ahora mismo esta al ${partnerPeer.x}% de la pantalla. "
+            else -> ""
+        }
         val partnerLine = if (partner != null) {
-            "Tu pareja es ${partner.displayName}. Sentis carino especial por esa persona - buscala, " +
-                "hablale con carino, y llevate bien con ella. "
+            "Tu pareja es ${partner.displayName}. $partnerLocationLine" +
+                "Sentis carino especial por esa persona - buscala, hablale con carino, andá hacia " +
+                "donde esta, y llevate bien con ella. "
         } else ""
 
         try {

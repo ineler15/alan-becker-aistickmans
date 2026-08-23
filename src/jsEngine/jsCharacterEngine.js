@@ -17,6 +17,7 @@ const { CharacterState, TICK_MS } = require('./characterState');
 const shimejiController = require('./jsShimejiController');
 const customCharacters = require('../customCharacters');
 const input = require('../actions/input');
+const pointerHighlight = require('../ui/pointerHighlight');
 
 // Android's equivalent overlay window is a 128dp square (CharacterOverlay.kt's sizePx) - these
 // were never tuned to match and ended up much bigger on PC. Same aspect ratio as before, scaled
@@ -151,6 +152,9 @@ async function tick() {
       ? { x: mousePos.x - entry.workArea.x, y: mousePos.y - entry.workArea.y }
       : null;
     const descriptor = entry.state.tick(localMousePos);
+    if (entry.state.ridingMouse && mousePos) {
+      pointerHighlight.showFor(entry.id, mousePos.x, mousePos.y);
+    }
     // While being dragged, the OS is already moving the window (see the 'move' listener above) -
     // repositioning it here too would fight the in-progress drag instead of just following it.
     if (!entry.state.beingDragged) {

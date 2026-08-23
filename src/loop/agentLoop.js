@@ -140,9 +140,20 @@ async function tickCharacter(character, perception, userMessageText) {
     // the emergent "crush" behavior in the system prompts - a designated fact, not something that
     // may or may not surface on its own.
     const partner = character.partnerId ? CHARACTERS.ALL.find((c) => c.id === character.partnerId) : null;
+    // Restate the partner's live position directly here instead of relying on the model to find
+    // the right entry in "peers" by name on its own - the peers array already has this (it's the
+    // same status.x/y every peer carries), but repeating it right next to "this one is your
+    // partner" is what actually makes characters go find each other reliably.
+    const partnerPeer = partner ? peers.find((p) => p.id === partner.id) : null;
+    const partnerLocationLine =
+      partnerPeer && partnerPeer.status
+        ? `Ahora mismo esta en x=${Math.round(partnerPeer.status.x)}, y=${Math.round(partnerPeer.status.y)}${
+            partnerPeer.device === 'tablet' ? ' (en la tablet)' : ''
+          }. `
+        : '';
     const partnerLine = partner
-      ? `Tu pareja es ${partner.displayName}. Sentis carino especial por esa persona - buscala, ` +
-        'hablale con carino, y llevate bien con ella. '
+      ? `Tu pareja es ${partner.displayName}. ${partnerLocationLine}Sentis carino especial por esa persona - buscala, ` +
+        'hablale con carino, andá hacia donde esta, y llevate bien con ella. '
       : '';
 
     const context = {
