@@ -198,8 +198,13 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
     /** Called every TICK_MS while beingDragged, following the finger. */
     fun dragTo(px: Int, py: Int) {
         lastActiveAt = System.currentTimeMillis()
-        x = px
-        y = py
+        // Clamp to the floor/screen bounds - an unclamped py past floorY would make the very
+        // next tick()'s falling-branch check (`y >= floorY`) fire on its first frame, snapping
+        // straight to the floor with no fall animation instead of a smooth drop. Found on the PC
+        // port (OS-level window drag can go past the taskbar) but the underlying state machine
+        // is shared, so a stray finger drag past the screen edge here would hit the same bug.
+        x = px.coerceIn(0, screenWidth)
+        y = py.coerceAtMost(floorY)
         frameCounter++
         if (frameCounter >= WALK_FRAME_TICKS) {
             frameCounter = 0
