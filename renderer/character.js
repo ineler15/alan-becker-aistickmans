@@ -9,6 +9,11 @@ const { ipcRenderer } = require('electron');
 
 const params = new URLSearchParams(location.search);
 const characterId = params.get('id');
+// The rig's own visual box (jsCharacterEngine.js's RIG_WIDTH/RIG_HEIGHT) - kept separate from the
+// actual (larger) window size, which pads out extra room for the speech bubble. Falls back to the
+// window's own size if launched without these (e.g. the older standalone rig-test page).
+const rigWidth = Number(params.get('rw')) || window.innerWidth;
+const rigHeight = Number(params.get('rh')) || window.innerHeight;
 
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
@@ -68,19 +73,45 @@ function colorCss(rgba) {
   return `rgba(${rgba[0]},${rgba[1]},${rgba[2]},${rgba[3] / 255})`;
 }
 
-// Locked to the rest pose's bounding box so the character doesn't visibly grow/shrink switching
-// between poses of different heights - same fix as the Android renderer (RigView.kt).
-let restBoundsCache = null;
-function restBounds() {
-  if (!restBoundsCache) restBoundsCache = bounds(layout(figure.root, 0, { x: 0, y: 0 }, [], []));
-  return restBoundsCache;
+// Locked to a fixed bounding box so the character doesn't visibly grow/shrink switching between
+// poses of different heights - same fix as the Android renderer (RigView.kt). NOT just the rest
+// pose's own bounds though: fallPose swings arms/legs far past rest (+-60/30 degrees), and with
+// only 12% padding that stuck out past the canvas edge and got clipped - looked like the fall
+// animation was "bugging out". Union rest bounds with every pose's bounds up front instead, so
+// the scale-fit has room for the most extreme one without needing to special-case fall.
+let maxBoundsCache = null;
+function maxBounds() {
+  if (maxBoundsCache) return maxBoundsCache;
+  const restPose = currentPose;
+  let acc = null;
+  const union = (a, b) => {
+    if (!a) return b;
+    const minX = Math.min(a.x, b.x);
+    const minY = Math.min(a.y, b.y);
+    const maxX = Math.max(a.x + a.w, b.x + b.w);
+    const maxY = Math.max(a.y + a.h, b.y + b.h);
+    return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+  };
+  const kinds = ['stand', 'sit', 'walk', 'run', 'bounce', 'trip', 'fall', 'pinch', 'angry', 'sleep', 'tired'];
+  // Several poses swing with `frame` on a sine wave (walk/run/bounce/trip/pinch/angry/sleep,
+  // periods up to 20) - frame 0 alone would miss their peak amplitude entirely (sin(0) = 0).
+  // Sampling a full 20-frame span covers every period's peak regardless of which kind it is.
+  for (const kind of kinds) {
+    for (let frame = 0; frame < 20; frame++) {
+      currentPose = window.PoseLibrary.forDescriptor({ kind, frame }, characterId);
+      acc = union(acc, bounds(layout(figure.root, 0, { x: 0, y: 0 }, [], [])));
+    }
+  }
+  currentPose = restPose;
+  maxBoundsCache = acc || bounds(layout(figure.root, 0, { x: 0, y: 0 }, [], []));
+  return maxBoundsCache;
 }
 
 function draw() {
   if (!figure) return;
   const bones = layout(figure.root, 0, { x: 0, y: 0 }, [], []);
   if (!bones.length) return;
-  const rb = restBounds();
+  const rb = maxBounds();
   const padding = canvas.width * 0.12;
   const scale = Math.min(
     (canvas.width - padding * 2) / Math.max(rb.w, 1),
@@ -171,9 +202,9 @@ ipcRenderer.on('character:pose', (_event, payload) => {
 });
 
 function resizeCanvas() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-  restBoundsCache = null;
+  canvas.width = rigWidth;
+  canvas.height = rigHeight;
+  maxBoundsCache = null;
   draw();
 }
 

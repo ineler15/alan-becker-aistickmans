@@ -128,8 +128,13 @@ class CharacterState {
 
   dragTo(px, py) {
     this.lastActiveAt = Date.now();
-    this.x = px;
-    this.y = py;
+    // Clamp to the floor: on PC the OS lets you drag the window past the taskbar/screen edge
+    // (unlike Android's touch drag, which stays on-screen), so an unclamped py here could end
+    // up past floorY - then the very next tick()'s `this.y >= this.floorY` check in the falling
+    // branch fires immediately, snapping the character straight to the floor with no fall
+    // animation at all instead of a smooth drop.
+    this.x = Math.min(this.screenWidth, Math.max(0, px));
+    this.y = Math.min(this.floorY, py);
     this.frameCounter++;
     if (this.frameCounter >= WALK_FRAME_TICKS) {
       this.frameCounter = 0;

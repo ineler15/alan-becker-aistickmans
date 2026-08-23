@@ -14,8 +14,21 @@ const path = require('path');
 const { CharacterState, TICK_MS } = require('./characterState');
 const shimejiController = require('./jsShimejiController');
 
-const WINDOW_WIDTH = 200;
-const WINDOW_HEIGHT = 260;
+// Android's equivalent overlay window is a 128dp square (CharacterOverlay.kt's sizePx) - these
+// were never tuned to match and ended up much bigger on PC. Same aspect ratio as before, scaled
+// down so the on-screen character size is closer to Android's. Cut again after 130x170 still
+// looked oversized live - adjust further here if still off, it's just a constant.
+// RIG_WIDTH/RIG_HEIGHT is the character's own visual box (used for the rig's scale-fit in
+// character.js) - kept small and separate from the actual OS window size below, which pads out
+// extra room around it for the speech bubble. Without that padding the bubble had nowhere valid
+// to render (a BrowserWindow can't draw outside its own rectangle) and was invisible - see
+// character.html's #speech positioning.
+const RIG_WIDTH = 80;
+const RIG_HEIGHT = 105;
+const BUBBLE_SIDE_MARGIN = 60;
+const BUBBLE_TOP_MARGIN = 50;
+const WINDOW_WIDTH = RIG_WIDTH + BUBBLE_SIDE_MARGIN * 2;
+const WINDOW_HEIGHT = RIG_HEIGHT + BUBBLE_TOP_MARGIN;
 const DRAG_END_QUIET_MS = 150;
 
 let entries = [];
@@ -26,6 +39,8 @@ function windowSize() {
   return {
     width: Math.round(WINDOW_WIDTH / scaleFactor),
     height: Math.round(WINDOW_HEIGHT / scaleFactor),
+    rigWidth: Math.round(RIG_WIDTH / scaleFactor),
+    rigHeight: Math.round(RIG_HEIGHT / scaleFactor),
   };
 }
 
@@ -47,7 +62,7 @@ function createWindow(character, startX, startY, size) {
     },
   });
   win.loadFile(path.join(__dirname, '..', '..', 'renderer', 'character.html'), {
-    query: { id: character.id },
+    query: { id: character.id, rw: String(size.rigWidth), rh: String(size.rigHeight) },
   });
   return win;
 }
@@ -70,6 +85,14 @@ function start(characters) {
     const entry = { id: character.id, character, state, win, dragEndTimer: null, workArea, size };
 
     win.on('move', () => {
+      // setBounds() below (used to animate falling/walking/etc.) fires this same 'move' event -
+      // without this guard, every animated reposition looked like the user grabbing the window,
+      // flipping beingDragged back to true and aborting the fall mid-animation. Only real,
+      // OS-initiated drags (the user's cursor actually moving the window) should reach here.
+      if (entry.programmaticMove) {
+        entry.programmaticMove = false;
+        return;
+      }
       const b = win.getBounds();
       state.beingDragged = true;
       state.dragTo(
@@ -103,6 +126,7 @@ function tick() {
     if (!entry.state.beingDragged) {
       const x = Math.round(entry.workArea.x + entry.state.x - entry.size.width / 2);
       const y = Math.round(entry.state.y - entry.size.height);
+      entry.programmaticMove = true;
       entry.win.setBounds({ x, y, width: entry.size.width, height: entry.size.height });
     }
     entry.win.webContents.send('character:pose', {

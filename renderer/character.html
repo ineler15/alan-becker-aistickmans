@@ -17,21 +17,33 @@
         -webkit-app-region: drag;
       }
       canvas {
+        /* Fixed to the rig's own small visual box (see ?rw=/&rh= in character.js) and pinned to
+           the window's bottom-center - the actual OS window is padded out bigger than this so
+           the speech bubble below has somewhere valid to render, without changing the
+           character's on-screen size (that's the scale-fit target in character.js's draw()). */
         display: block;
         background: transparent;
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
       }
       #speech {
+        /* Was `bottom: 100%` (fully above the container) - a BrowserWindow can only render
+           inside its own rectangle, so that placed the whole bubble off-window and it was never
+           actually visible, at any window size. Anchored to the window's own top edge instead,
+           which now has real padding above the (smaller, bottom-pinned) canvas to hold it. */
         position: absolute;
-        bottom: 100%;
+        top: 0;
         left: 50%;
         transform: translateX(-50%);
         background: rgba(255, 255, 255, 0.93);
         color: #111;
-        padding: 6px 10px;
+        padding: 4px 8px;
         border-radius: 8px;
         font-family: system-ui, sans-serif;
-        font-size: 12px;
-        max-width: 220px;
+        font-size: 11px;
+        max-width: 200px;
         white-space: normal;
         text-align: center;
         display: none;
