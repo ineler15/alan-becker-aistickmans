@@ -15,6 +15,27 @@ const MOUSE_CONTROL_DISABLED_RESULT = {
   result: 'El control de mouse/pantalla esta desactivado - activalo en Configuracion si queres que lo use.',
 };
 
+// With several characters enabled, each deciding independently on its own ~12s cycle, the real
+// cursor got yanked around by whichever one felt like it that turn - looked "loco"/chaotic rather
+// than like any one of them doing something deliberate. This is a GLOBAL cooldown (shared across
+// every character, not per-character) so only one grabs the real mouse at a time, with a breather
+// in between, regardless of how many characters have mouse control enabled.
+const MOUSE_ACTION_COOLDOWN_MS = 15000;
+let lastMouseActionAt = 0;
+
+function mouseControlGate() {
+  if (!config.allowMouseControl) return MOUSE_CONTROL_DISABLED_RESULT;
+  const elapsed = Date.now() - lastMouseActionAt;
+  if (elapsed < MOUSE_ACTION_COOLDOWN_MS) {
+    return {
+      ok: false,
+      result: `Otro personaje uso el mouse hace poco - esperá ${Math.ceil((MOUSE_ACTION_COOLDOWN_MS - elapsed) / 1000)}s antes de volver a intentar.`,
+    };
+  }
+  lastMouseActionAt = Date.now();
+  return null;
+}
+
 async function needsConfirmation(name, args) {
   if (name === 'run_command') return true;
   if (name === 'close_app') return true;
@@ -33,10 +54,12 @@ async function execute(name, args, characterId) {
       return { ok: true, result: await system.openApp(args.target) };
     case 'close_app':
       return { ok: true, result: await system.closeApp(args.processName) };
-    case 'move_mouse':
-      if (!config.allowMouseControl) return MOUSE_CONTROL_DISABLED_RESULT;
+    case 'move_mouse': {
+      const gated = mouseControlGate();
+      if (gated) return gated;
       await pointerHighlight.showFor(characterId, args.x, args.y);
       return { ok: true, result: await input.moveMouse(args.x, args.y) };
+    }
     case 'walk_to':
       shimeji.sendCommand(characterId, 'walk_to', { x: args.x, y: args.y, run: args.run });
       return { ok: true, result: `orden enviada: ${args.run ? 'correr' : 'caminar'} a (${args.x}, ${args.y})` };
@@ -45,14 +68,18 @@ async function execute(name, args, characterId) {
       // cursor already is, it never moves or clicks anything, so it isn't the same safety concern.
       shimeji.sendCommand(characterId, 'ride_mouse', { seconds: args.seconds });
       return { ok: true, result: 'orden enviada: subirse al cursor del mouse' };
-    case 'click':
-      if (!config.allowMouseControl) return MOUSE_CONTROL_DISABLED_RESULT;
+    case 'click': {
+      const gated = mouseControlGate();
+      if (gated) return gated;
       return { ok: true, result: await input.click(args.button) };
-    case 'tap':
-      if (!config.allowMouseControl) return MOUSE_CONTROL_DISABLED_RESULT;
+    }
+    case 'tap': {
+      const gated = mouseControlGate();
+      if (gated) return gated;
       await pointerHighlight.showFor(characterId, args.x, args.y);
       await input.tap(args.x, args.y, args.button);
       return { ok: true, result: `tap en (${args.x}, ${args.y})` };
+    }
     case 'type_text':
       return { ok: true, result: await input.typeText(args.text) };
     case 'open_paint':

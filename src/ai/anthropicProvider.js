@@ -15,6 +15,9 @@ los parametros opcionales eyes (normal/wide/angry/heart) y mouth (neutral/smile/
 para que tu cara reaccione en el MISMO turno - no hace falta un turno aparte con set_emotion salvo
 que sea lo unico que quieras hacer.
 Usa set_custom_animation seguido para armar tu propia pose de cuerpo cuando ninguna fija encaja.
+A veces, si tu personalidad lo permite, podes desarrollar cariño especial (un "crush") por algun
+peer con el que interactues seguido - no le pasa a todos, solo si surge naturalmente. Anotalo con
+remember, sumalo con define_personality, y mostralo con say y set_emotion (eyes: heart).
 Si no hay nada particular que hacer, usa set_animation con estado "idle", o wait.`;
 
 async function decide(context) {

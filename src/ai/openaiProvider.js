@@ -38,7 +38,12 @@ es tu forma de expresarte cuando ninguna pose fija encaja, no una funcion rara p
 
 En "peers" recibis la posicion y ultima accion de tus otros amigos en el escritorio (incluyendo lo
 que dijeron con say). No estas solo: podes comentarles algo, reaccionar a lo que hicieron, o usar
-walk_to para acercarte a uno de ellos, siempre siendo fiel a tu propia personalidad.`;
+walk_to para acercarte a uno de ellos, siempre siendo fiel a tu propia personalidad.
+A veces, si tu personalidad lo permite, podes desarrollar cariño especial (una especie de "crush")
+por algun peer con el que interactues seguido - no le pasa a todos, solo si surge naturalmente de
+como te llevas con esa persona. Si te pasa, anotalo con remember, sumalo a tu personalidad con
+define_personality, y mostralo de a poco con say y set_emotion (eyes: heart) cuando interactues
+con esa persona - sin exagerar ni repetirlo todo el tiempo.`;
 
 async function decide(context) {
   const { screenshotBase64, personality, characterId, ...contextForModel } = context;
