@@ -9,6 +9,10 @@ const { ipcRenderer } = require('electron');
 
 const params = new URLSearchParams(location.search);
 const characterId = params.get('id');
+// A custom character's own id isn't in poseLibrary.js's PROFILE_BY_ID - jsCharacterEngine.js
+// resolves which built-in profile its rig was cloned from (Red/TCO) and passes it here so it
+// actually animates. Absent for built-in characters, which just use their own id as before.
+const poseId = params.get('poseProfile') || characterId;
 // The rig's own visual box (jsCharacterEngine.js's RIG_WIDTH/RIG_HEIGHT) - kept separate from the
 // actual (larger) window size, which pads out extra room for the speech bubble. Falls back to the
 // window's own size if launched without these (e.g. the older standalone rig-test page).
@@ -98,7 +102,7 @@ function maxBounds() {
   // Sampling a full 20-frame span covers every period's peak regardless of which kind it is.
   for (const kind of kinds) {
     for (let frame = 0; frame < 20; frame++) {
-      currentPose = window.PoseLibrary.forDescriptor({ kind, frame }, characterId);
+      currentPose = window.PoseLibrary.forDescriptor({ kind, frame }, poseId);
       acc = union(acc, bounds(layout(figure.root, 0, { x: 0, y: 0 }, [], [])));
     }
   }
@@ -189,7 +193,7 @@ function draw() {
 
 ipcRenderer.on('character:pose', (_event, payload) => {
   if (payload.id !== characterId) return;
-  currentPose = window.PoseLibrary.forDescriptor(payload.descriptor, characterId);
+  currentPose = window.PoseLibrary.forDescriptor(payload.descriptor, poseId);
   if (payload.lookRight !== undefined) lookRight = payload.lookRight;
   canvas.style.transform = lookRight ? 'scaleX(-1)' : 'none';
   if (payload.speechText) {

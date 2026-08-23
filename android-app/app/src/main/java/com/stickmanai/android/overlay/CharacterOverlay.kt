@@ -11,6 +11,7 @@ import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.TextView
 import com.stickmanai.android.CharacterDef
+import com.stickmanai.android.Prefs
 import com.stickmanai.android.input.TapAccessibilityService
 
 /**
@@ -41,6 +42,10 @@ class CharacterOverlay(
     // other character keeps using sprites untouched.
     private val rigFigure = RigFigure.forCharacterOrNull(context, def.id)
     private val sprites = if (rigFigure == null) SpriteSet.forCharacter(context, def.id) else null
+    // A custom character's own id isn't in PoseLibrary's PROFILE_BY_ID - use whichever built-in
+    // profile (Red/TCO) its rig was cloned from instead, so it actually animates. Null (built-in
+    // character) falls back to def.id, same as before this existed.
+    private val poseId = Prefs.poseProfileFor(context, def.id) ?: def.id
     private val density = context.resources.displayMetrics.density
     val sizePx = (128 * density).toInt()
     private val floorY = screenHeightPx - (48 * density).toInt()
@@ -122,7 +127,7 @@ class CharacterOverlay(
     fun tick() {
         val kind = state.tick()
         if (rigView != null) {
-            rigView.pose = PoseLibrary.forFrameKind(kind, def.id)
+            rigView.pose = PoseLibrary.forFrameKind(kind, poseId)
         } else {
             val bitmap = when (kind) {
                 is CharacterState.FrameKind.Stand -> sprites!!.stand

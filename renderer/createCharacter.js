@@ -11,7 +11,7 @@ function layout(node, parentAngleDeg, parentEnd, acc) {
   const localX = isRoot ? 0 : node.l * Math.cos(rad) * node.sc;
   const localY = isRoot ? 0 : -node.l * Math.sin(rad) * node.sc;
   const end = { x: start.x + localX, y: start.y + localY };
-  if (!isRoot) acc.push({ node, start, end });
+  if (!isRoot) acc.push({ node, start, end, curveRadius: node.cr || 0 });
   (node.ch || []).forEach((child) => layout(child, globalAngleDeg, end, acc));
   return acc;
 }
@@ -50,15 +50,6 @@ function colorCss(rgba) {
   return `rgba(${rgba[0]},${rgba[1]},${rgba[2]},${rgba[3] / 255})`;
 }
 
-function findHeadNode(node) {
-  if (node.t === 'Circle' || node.t === 'FilledCircle') return node;
-  for (const child of node.ch || []) {
-    const found = findHeadNode(child);
-    if (found) return found;
-  }
-  return null;
-}
-
 function draw(ctx, canvas, figure) {
   const bones = layout(figure.root, 0, { x: 0, y: 0 }, []);
   if (!bones.length) return;
@@ -74,7 +65,14 @@ function draw(ctx, canvas, figure) {
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  for (const bone of bones) {
+  // "Hollow" heads (TCO/TSC/TDL's template) aren't a Circle node at all - they're a chain of
+  // curved bones (node.cr != 0) meant to be stroked as ONE smooth ring, not as separate straight
+  // segments (which reads as a jagged octagon instead of a circle - see sn_proto_wasm_renderer
+  // memory). Mirrors renderer/character.js's curveRadius handling.
+  const consumed = new Set();
+  for (let i = 0; i < bones.length; i++) {
+    if (consumed.has(i)) continue;
+    const bone = bones[i];
     const node = bone.node;
     const color = colorCss(figure.color);
 
@@ -97,6 +95,31 @@ function draw(ctx, canvas, figure) {
     }
 
     if (node.th <= 0) continue;
+
+    if (bone.curveRadius) {
+      const chain = [bone];
+      let j = i + 1;
+      while (j < bones.length && bones[j].curveRadius && bones[j].start === chain[chain.length - 1].end) {
+        chain.push(bones[j]);
+        consumed.add(j);
+        j++;
+      }
+      const pts = [tx(chain[0].start), ...chain.map((c) => tx(c.end))];
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let k = 1; k < pts.length - 1; k++) {
+        const mx = (pts[k].x + pts[k + 1].x) / 2;
+        const my = (pts[k].y + pts[k + 1].y) / 2;
+        ctx.quadraticCurveTo(pts[k].x, pts[k].y, mx, my);
+      }
+      ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+      ctx.lineWidth = Math.max(1, node.th * scale);
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = color;
+      ctx.stroke();
+      continue;
+    }
+
     const s = tx(bone.start);
     const e = tx(bone.end);
     ctx.beginPath();
@@ -115,7 +138,10 @@ const nameInput = document.getElementById('name');
 const swatchesEl = document.getElementById('swatches');
 const createBtn = document.getElementById('createBtn');
 
-let template = null;
+// "Normal" = Red's rig (filled Circle head); "hollow" = TCO's rig (ring of curved bones, no
+// Circle node at all) - see src/customCharacters.js's buildRig() for why these can't be the same
+// base rig with a flag flipped.
+const templates = { normal: null, hollow: null };
 let selectedColor = null;
 
 function headModel() {
@@ -123,20 +149,21 @@ function headModel() {
 }
 
 function redraw() {
+  const template = templates[headModel()];
   if (!template || !selectedColor) return;
   const figure = JSON.parse(JSON.stringify(template));
   figure.color = selectedColor;
-  const head = findHeadNode(figure.root);
-  if (head) head.hollow = headModel() === 'hollow';
   draw(ctx, canvas, figure);
 }
 
 async function init() {
-  const [palette, rigRes] = await Promise.all([
+  const [palette, normalRes, hollowRes] = await Promise.all([
     window.stickmanAPI.getPalette(),
     fetch('rigs/Red.json'),
+    fetch('rigs/TCO.json'),
   ]);
-  template = await rigRes.json();
+  templates.normal = await normalRes.json();
+  templates.hollow = await hollowRes.json();
 
   for (const color of palette) {
     const swatch = document.createElement('div');

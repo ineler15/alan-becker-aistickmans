@@ -73,6 +73,10 @@ function createWindow(character, startX, startY, size) {
     // Windows paths (backslashes, drive letters) aren't valid file:// URLs as-is - build the
     // proper URL here in the main process rather than string-concatenating in the renderer.
     if (rigPath) query.customRigUrl = pathToFileURL(rigPath).href;
+    // poseLibrary.js's PROFILE_BY_ID only knows built-in ids - point it at whichever one this
+    // custom character's rig was cloned from so it actually animates instead of standing frozen.
+    const poseProfile = customCharacters.poseProfileFor(character.id);
+    if (poseProfile) query.poseProfile = poseProfile;
   }
   win.loadFile(path.join(__dirname, '..', '..', 'renderer', 'character.html'), { query });
   return win;

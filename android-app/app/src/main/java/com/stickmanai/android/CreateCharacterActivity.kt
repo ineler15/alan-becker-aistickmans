@@ -38,7 +38,8 @@ class CreateCharacterActivity : AppCompatActivity() {
                 Toast.makeText(this, R.string.create_character_name_required, Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            val def = Prefs.addCustomCharacter(this, name)
+            val headModel = if (isHollow()) "hollow" else "normal"
+            val def = Prefs.addCustomCharacter(this, name, headModel)
             val rig = RigTemplate.build(this, selectedColor, isHollow())
             RigTemplate.save(this, def.id, rig)
             finish()

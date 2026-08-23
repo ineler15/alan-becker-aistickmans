@@ -5,7 +5,23 @@ const CHARACTERS = require('./characters');
 
 const CUSTOM_CHARACTERS_PATH = path.join(config.workspaceDir, 'custom_characters.json');
 const CUSTOM_RIGS_DIR = path.join(config.workspaceDir, 'custom_rigs');
-const RED_RIG_TEMPLATE_PATH = path.join(config.rootDir, 'renderer', 'rigs', 'Red.json');
+
+// "Normal" head = Red's rig: the head is one filled Circle node. "Hollow" head = TCO's rig: the
+// head is a chain of curved RoundedSegment bones stroked into a ring (see renderer/character.js's
+// curveRadius handling) - there's no Circle node in it at all, so it can't be produced by flipping
+// a flag on Red's head. TCO was picked over TDL (same ring construction) because TDL's rig also
+// carries a sword prop (extra colored Segment nodes) that don't belong on a generic custom character.
+const RIG_TEMPLATE_PATH = {
+  normal: path.join(config.rootDir, 'renderer', 'rigs', 'Red.json'),
+  hollow: path.join(config.rootDir, 'renderer', 'rigs', 'TCO.json'),
+};
+
+// renderer/poseLibrary.js's PROFILE_BY_ID only has entries for the built-in characters it names
+// (Red, TCO, etc.) - a custom character's own id (e.g. "JoseNandu") isn't in there, so without
+// this it would fall through to an empty pose and never animate. Since a custom rig is always an
+// exact clone of one of these two templates (same bone paths, same rest angles), telling
+// PoseLibrary to look up THIS id instead of the character's own is enough to fully animate it.
+const POSE_PROFILE_BY_HEAD_MODEL = { normal: 'Red', hollow: 'TCO' };
 
 // Same 8 swatches on PC and Android so "crear tu propio stickman" looks the same on both -
 // the 6 existing character colors plus black/white for anyone who wants neither.
@@ -59,23 +75,10 @@ function sanitizeId(displayName) {
   return id;
 }
 
-// Head is the single Circle node in the whole rig tree - find it recursively instead of
-// hardcoding a path, since which branch it sits under is just an artifact of how Red's rig
-// happened to be authored.
-function findHeadNode(node) {
-  if (node.t === 'Circle' || node.t === 'FilledCircle') return node;
-  for (const child of node.ch || []) {
-    const found = findHeadNode(child);
-    if (found) return found;
-  }
-  return null;
-}
-
 function buildRig(color, headModel) {
-  const template = JSON.parse(fs.readFileSync(RED_RIG_TEMPLATE_PATH, 'utf8'));
+  const templatePath = RIG_TEMPLATE_PATH[headModel] || RIG_TEMPLATE_PATH.normal;
+  const template = JSON.parse(fs.readFileSync(templatePath, 'utf8'));
   template.color = color;
-  const head = findHeadNode(template.root);
-  if (head) head.hollow = headModel === 'hollow';
   return template;
 }
 
@@ -101,9 +104,17 @@ function customRigPath(id) {
   return fs.existsSync(p) ? p : null;
 }
 
+// Null for a built-in character (or an unknown id) - callers should keep using the character's
+// own id as the pose lookup key in that case.
+function poseProfileFor(id) {
+  const record = load().find((c) => c.id === id);
+  return record ? POSE_PROFILE_BY_HEAD_MODEL[record.headModel] || 'Red' : null;
+}
+
 module.exports = {
   PALETTE,
   loadIntoRoster,
   create,
   customRigPath,
+  poseProfileFor,
 };

@@ -95,7 +95,8 @@ object Prefs {
 
     // Sanitizes displayName into an id (letters/digits only, deduped against every existing
     // builtin + custom id) and appends it - mirrors src/customCharacters.js's sanitizeId on PC.
-    fun addCustomCharacter(context: Context, displayName: String): CharacterDef {
+    // headModel ("normal"/"hollow") is stored alongside so poseProfileFor() below can find it later.
+    fun addCustomCharacter(context: Context, displayName: String, headModel: String): CharacterDef {
         val base = displayName.filter { it.isLetterOrDigit() }.ifBlank { "Stickman" }
         val existingIds = allCharacters(context).map { it.id }.toSet()
         var id = base
@@ -111,9 +112,26 @@ object Prefs {
         val entry = org.json.JSONObject()
         entry.put("id", def.id)
         entry.put("displayName", def.displayName)
+        entry.put("headModel", headModel)
         array.put(entry)
         sp(context).edit().putString("custom_characters", array.toString()).apply()
         return def
+    }
+
+    // PoseLibrary's PROFILE_BY_ID only knows built-in ids - a custom character's rig is always an
+    // exact clone of Red's (headModel "normal") or TCO's (headModel "hollow") rig, so pointing
+    // PoseLibrary at that id instead of the custom one is enough to fully animate it. Null for a
+    // built-in character (or an unknown id), so callers keep using the character's own id then.
+    fun poseProfileFor(context: Context, characterId: String): String? {
+        val raw = sp(context).getString("custom_characters", "[]") ?: "[]"
+        val array = JSONArray(raw)
+        for (i in 0 until array.length()) {
+            val obj = array.getJSONObject(i)
+            if (obj.getString("id") == characterId) {
+                return if (obj.optString("headModel") == "hollow") "TCO" else "Red"
+            }
+        }
+        return null
     }
 
     // "ip:puerto" of the desktop app's peer server (src/net/peerServer.js), so the tablet's
