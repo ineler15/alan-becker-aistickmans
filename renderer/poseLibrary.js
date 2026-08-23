@@ -199,9 +199,23 @@
 
   // Friendly names an AI-authored keyframe can use (see set_custom_animation) mapped to the
   // actual bone paths - keeps the raw path lists (child-index lists, meaningless to a model, and
-  // different per topology) out of the AI-facing schema entirely.
-  function customPose(paths, angles) {
-    return byPath(paths, angles || {});
+  // different per topology) out of the AI-facing schema entirely. Angles are DELTAS from this
+  // character's own rest pose, same convention every pose function above already uses internally
+  // (e.g. sitPose's `rest.leg1 - 56.8`) - NOT raw absolute degrees. This is what makes the numbers
+  // calibratable across characters despite each rest topology using wildly different absolute
+  // values (Red's arm1 rest is -207.92, TCO's is -143.3, but a "-60" delta means roughly the same
+  // gesture on both) - see actions.schema.js's set_custom_animation description for the legend of
+  // calibrated example deltas this enables.
+  function customPose(paths, rest, angles) {
+    if (!angles) return new Map();
+    const resolved = {};
+    for (const name in angles) {
+      if (!(name in paths)) continue;
+      const base = name === 'torso' ? rest.torsoLower : rest[name];
+      if (base === undefined) continue;
+      resolved[name] = base + (Number(angles[name]) || 0);
+    }
+    return byPath(paths, resolved);
   }
 
   /** descriptor: {kind, frame?, angles?} from CharacterState.tick(). Returns Map<pathKey, angle>. */
@@ -233,7 +247,7 @@
       case 'tired':
         return tiredPose(paths, rest);
       case 'custom':
-        return customPose(paths, descriptor.angles);
+        return customPose(paths, rest, descriptor.angles);
       default:
         return new Map();
     }

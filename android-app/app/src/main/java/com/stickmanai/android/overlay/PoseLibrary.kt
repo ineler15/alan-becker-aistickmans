@@ -267,10 +267,31 @@ object PoseLibrary {
         "arm2" to paths.arm2,
     )
 
-    /** Builds a Pose from an AI-authored keyframe's friendly-named angles; unknown names are ignored. */
-    private fun customPose(paths: BonePathSet, angles: Map<String, Float>): Pose {
+    private fun restFor(rest: RestAngles, name: String): Float? = when (name) {
+        "torso" -> rest.torsoLower
+        "leg1" -> rest.leg1
+        "leg1Shin" -> rest.leg1Shin
+        "leg2" -> rest.leg2
+        "leg2Shin" -> rest.leg2Shin
+        "arm1" -> rest.arm1
+        "arm2" -> rest.arm2
+        else -> null
+    }
+
+    // Angles are DELTAS from this character's own rest pose, same convention every pose function
+    // above already uses internally (e.g. sitPose's `rest.leg1 - 56.8f`) - NOT raw absolute
+    // degrees. This is what makes the numbers calibratable across characters despite each rest
+    // topology using wildly different absolute values (Red's arm1 rest is -207.92, TCO's is
+    // -143.3, but a "-60" delta means roughly the same gesture on both) - see ActionsSchema.kt's
+    // set_custom_animation description for the legend of calibrated example deltas this enables.
+    /** Builds a Pose from an AI-authored keyframe's friendly-named angle deltas; unknown names are ignored. */
+    private fun customPose(paths: BonePathSet, rest: RestAngles, angles: Map<String, Float>): Pose {
         val map = nameToPath(paths)
-        return angles.mapNotNull { (name, angle) -> map[name]?.let { it to angle } }.toMap()
+        return angles.mapNotNull { (name, delta) ->
+            val path = map[name] ?: return@mapNotNull null
+            val base = restFor(rest, name) ?: return@mapNotNull null
+            path to (base + delta)
+        }.toMap()
     }
 
     // Red/Blue/Green/Yellow are a true recolor (identical rig data, confirmed by comparing actual
@@ -306,7 +327,7 @@ object PoseLibrary {
             is CharacterState.FrameKind.Climb -> climbPose(profile, kind.frame)
             is CharacterState.FrameKind.Sleep -> sleepPose(profile, kind.frame)
             is CharacterState.FrameKind.Tired -> tiredPose(profile)
-            is CharacterState.FrameKind.Custom -> customPose(profile.paths, kind.angles)
+            is CharacterState.FrameKind.Custom -> customPose(profile.paths, profile.rest, kind.angles)
         }
     }
 }

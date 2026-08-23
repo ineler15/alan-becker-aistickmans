@@ -126,14 +126,22 @@ object ActionsSchema {
             tool(
                 "set_custom_animation",
                 "Armate tu propia mini-animacion (unica, no una de las poses fijas) moviendo tu cuerpo " +
-                    "cuadro por cuadro. Cada cuadro es un angulo en grados para las partes que quieras " +
-                    "mover (torso, leg1, leg1Shin, leg2, leg2Shin, arm1, arm2) - la parte que no " +
-                    "menciones se queda como estaba en el cuadro anterior. Si tenes cara propia, cada " +
-                    "cuadro tambien puede traer su propio eyes/mouth - si un cuadro no los trae, se " +
-                    "mantienen los ultimos que se usaron. Usa esto seguido, no solo de vez en cuando: es " +
-                    "tu forma de expresarte de verdad cuando ninguna pose fija encaja. Solo funciona " +
-                    "para vos si tu cuerpo es de los que soportan pose completa (no todos la tienen " +
-                    "todavia) - si no pasa nada, no insistas turno tras turno.",
+                    "cuadro por cuadro. Cada angulo es un DELTA en grados desde tu postura parada normal " +
+                    "(0 = se queda como estaba parado, no un angulo absoluto) - asi los mismos numeros dan " +
+                    "mas o menos el mismo gesto sin importar que personaje seas. La parte que no " +
+                    "menciones se queda como estaba en el cuadro anterior. Ejemplos calibrados de " +
+                    "referencia (copialos, combinalos, o inventa los tuyos con valores parecidos si no " +
+                    "hay uno para lo que queres): sentado = {leg1:-57, leg1Shin:65, leg2:55, leg2Shin:-63, " +
+                    "torso:6}; agachado/en cuclillas = {leg1Shin:22, leg2Shin:22, arm1:-22, arm2:22}; " +
+                    "brazos abiertos cayendo = {torso:-40, arm1:-60, arm2:60, leg1:30, leg2:-30}; " +
+                    "inclinado adelante con brazos cruzando el cuerpo = {torso:-25, arm1:40, arm2:-40}; " +
+                    "encorvado/cansado = {torso:-30, arm1:-20, arm2:20, leg1:15, leg1Shin:40, leg2:-15, " +
+                    "leg2Shin:40}. Si tenes cara propia, cada cuadro tambien puede traer su propio " +
+                    "eyes/mouth - si un cuadro no los trae, se mantienen los ultimos que se usaron. Usa " +
+                    "esto seguido, no solo de vez en cuando: es tu forma de expresarte de verdad cuando " +
+                    "ninguna pose fija encaja. Solo funciona para vos si tu cuerpo es de los que soportan " +
+                    "pose completa (no todos la tienen todavia) - si no pasa nada, no insistas turno tras " +
+                    "turno.",
                 JSONObject().put(
                     "keyframes",
                     JSONObject()
@@ -147,7 +155,7 @@ object ActionsSchema {
                                     "properties",
                                     JSONObject().apply {
                                         for (part in listOf("torso", "leg1", "leg1Shin", "leg2", "leg2Shin", "arm1", "arm2")) {
-                                            put(part, prop("number", "Angulo en grados para $part (opcional)"))
+                                            put(part, prop("number", "Delta en grados desde tu postura normal para $part (opcional, ver ejemplos calibrados arriba)"))
                                         }
                                         put("eyes", prop("string", "Ojos para este cuadro (opcional)", EYE_STYLES))
                                         put("mouth", prop("string", "Boca para este cuadro (opcional)", MOUTH_STYLES))

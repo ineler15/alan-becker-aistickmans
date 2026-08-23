@@ -150,16 +150,24 @@ const ACTIONS = [
     desc:
       'En vez de una pose fija de set_animation, crea tu propia animacion: una secuencia de hasta 12 ' +
       'posturas (keyframes) que se van a reproducir en orden, cada una mantenida un ratito (holdMs) antes ' +
-      'de pasar a la siguiente. Cada keyframe es un angulo (en grados) para las partes del cuerpo que ' +
-      'quieras mover ese paso - las que no incluyas se quedan como estaban. Si tenes cara propia, cada ' +
-      'keyframe tambien puede traer su propio eyes/mouth - si un keyframe no los trae, se mantienen los ' +
-      'ultimos que se usaron. Usa esto seguido, no solo de vez en cuando: es tu forma de expresarte de ' +
-      'verdad cuando ninguna pose predefinida encaja (un gesto, un baile, una reaccion fisica unica).',
+      'de pasar a la siguiente. Cada angulo es un DELTA en grados desde tu postura parada normal (0 = se ' +
+      'queda como estaba parado, no un angulo absoluto) - esto hace que los mismos numeros den mas o menos ' +
+      'el mismo gesto sin importar que personaje seas. Las partes que no incluyas en un keyframe se quedan ' +
+      'como estaban en el anterior. Ejemplos calibrados de referencia (podes copiarlos, combinarlos o ' +
+      'inventar los tuyos con valores parecidos si no encuentran uno para lo que queres hacer): sentado = ' +
+      '{leg1:-57, leg1Shin:65, leg2:55, leg2Shin:-63, torso:6}; agachado/en cuclillas = {leg1Shin:22, ' +
+      'leg2Shin:22, arm1:-22, arm2:22}; brazos abiertos cayendo = {torso:-40, arm1:-60, arm2:60, leg1:30, ' +
+      'leg2:-30}; inclinado hacia adelante con brazos cruzando el cuerpo = {torso:-25, arm1:40, arm2:-40}; ' +
+      'encorvado/cansado = {torso:-30, arm1:-20, arm2:20, leg1:15, leg1Shin:40, leg2:-15, leg2Shin:40}. Si ' +
+      'tenes cara propia, cada keyframe tambien puede traer su propio eyes/mouth - si un keyframe no los ' +
+      'trae, se mantienen los ultimos que se usaron. Usa esto seguido, no solo de vez en cuando: es tu ' +
+      'forma de expresarte de verdad cuando ninguna pose predefinida encaja (un gesto, un baile, una ' +
+      'reaccion fisica unica).',
     params: {
       keyframes:
-        'array de objetos (JSON string o array) - cada uno con angulos opcionales para ' +
-        'torso/leg1/leg1Shin/leg2/leg2Shin/arm1/arm2 (numeros, grados), eyes/mouth opcionales ' +
-        '(mismos valores que set_emotion) y holdMs opcional (100-3000, default 400)',
+        'array de objetos (JSON string o array) - cada uno con deltas opcionales (numeros, grados, ver ' +
+        'ejemplos calibrados arriba) para torso/leg1/leg1Shin/leg2/leg2Shin/arm1/arm2, eyes/mouth ' +
+        'opcionales (mismos valores que set_emotion) y holdMs opcional (100-3000, default 400)',
     },
     risky: false,
   },
