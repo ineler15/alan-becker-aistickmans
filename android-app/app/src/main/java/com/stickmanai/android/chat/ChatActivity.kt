@@ -40,5 +40,13 @@ class ChatActivity : AppCompatActivity() {
                 finish()
             }
         }
+
+        // Just a friendly nudge through the normal chat pipeline - the character reacts in its
+        // own voice/personality via say + set_emotion (already wired up), not a hardcoded reply.
+        binding.btnGiveSnack.setOnClickListener {
+            val text = "🍪 Te acaban de regalar un alfajor. ¡Disfrutalo!"
+            if (isGroup) PendingMessages.setAll(this, text) else PendingMessages.set(characterId, text)
+            finish()
+        }
     }
 }

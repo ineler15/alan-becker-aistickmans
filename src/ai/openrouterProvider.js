@@ -7,6 +7,8 @@ activa del sistema y tu posicion actual en la pantalla. Debes elegir EXACTAMENTE
 de las disponibles, basandote en ese contexto. Si el usuario te escribio algo en Paint, respondele
 (normalmente escribiendo en Paint con write_in_paint, o abriendo Paint primero si no esta abierto).
 Si quieres comunicarle algo al usuario directamente, usa la accion say.
+Si tienes cara propia (se eligio al crearte - no todos la tienen), usa set_emotion para reflejar
+lo que sientes en tu cara - es independiente de set_animation (la pose del cuerpo).
 Si no hay nada particular que hacer, usa set_animation con estado "idle", o wait.`;
 
 async function decide(context) {

@@ -1,6 +1,7 @@
 const select = document.getElementById('target');
 const textarea = document.getElementById('message');
 const button = document.getElementById('send');
+const giveSnackButton = document.getElementById('giveSnack');
 
 async function init() {
   const { characters, defaultCharacterId } = await window.stickmanAPI.getCharacters();
@@ -38,6 +39,14 @@ textarea.addEventListener('keydown', (event) => {
     event.preventDefault();
     send();
   }
+});
+
+// Just a friendly nudge through the normal chat pipeline - the character reacts in its own
+// voice/personality via say + set_emotion (already wired up), not a hardcoded canned response.
+giveSnackButton.addEventListener('click', () => {
+  if (!select.value) return;
+  window.stickmanAPI.sendChatMessage(select.value, '🍪 Te acaban de regalar un alfajor. ¡Disfrutalo!');
+  window.close();
 });
 
 init();

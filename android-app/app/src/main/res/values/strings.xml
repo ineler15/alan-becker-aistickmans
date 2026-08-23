@@ -5,6 +5,7 @@
     <string name="stop_service">Detener</string>
     <string name="gemini_api_key_hint">API key compartida (segun proveedor elegido arriba, opcional si cada uno tiene la suya)</string>
     <string name="send">Enviar</string>
+    <string name="give_snack">🍪 Alfajor</string>
     <string name="message_hint">Escribile algo…</string>
     <string name="pc_address_hint">IP:puerto de la PC (ej: 192.168.18.27:8787)</string>
     <string name="tap_accessibility_description">Le permite a tus personajes tocar la pantalla por vos (accion "tap"), como si fueran un dedo, y ver una captura de lo que hay en pantalla para poder comentarlo (se manda a la IA junto con tu posicion). Tambien chequea si el teclado esta abierto en cualquier app para esconderse y no taparlo. No lee texto ni el contenido interno de otras apps, solo la imagen de la pantalla, donde tocar y si hay un teclado en pantalla.</string>

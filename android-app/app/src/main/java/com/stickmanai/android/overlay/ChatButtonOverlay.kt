@@ -44,6 +44,12 @@ class ChatButtonOverlay(private val context: Context, private val windowManager:
         text = "Enviar"
     }
 
+    // Just a friendly nudge through the normal chat pipeline - the character reacts in its own
+    // voice/personality via say + set_emotion (already wired up), not a hardcoded canned response.
+    private val giveSnackButton = Button(context).apply {
+        text = "🍪"
+    }
+
     private val panel = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
         setBackgroundColor(Color.parseColor("#EEFFFFFF"))
@@ -51,6 +57,7 @@ class ChatButtonOverlay(private val context: Context, private val windowManager:
         setPadding(pad, pad, pad, pad)
         addView(editText, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         addView(sendButton)
+        addView(giveSnackButton)
         visibility = View.GONE
     }
 
@@ -81,6 +88,10 @@ class ChatButtonOverlay(private val context: Context, private val windowManager:
         windowManager.addView(panel, panelParams)
         button.setOnClickListener { togglePanel() }
         sendButton.setOnClickListener { send() }
+        giveSnackButton.setOnClickListener {
+            PendingMessages.setAll(context, "🍪 Te acaban de regalar un alfajor. ¡Disfrutalo!")
+            hidePanel()
+        }
         editText.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEND) {
                 send()
