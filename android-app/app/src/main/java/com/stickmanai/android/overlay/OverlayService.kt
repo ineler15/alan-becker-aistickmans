@@ -28,6 +28,22 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
+// User-controlled 0-100 slider (MainActivity's SeekBar next to the partner Spinner) instead of a
+// single fixed "es tu pareja" phrase - lets the user dial a relationship anywhere from
+// barely-registers to head-over-heels rather than only on/off. Deliberately coarse tiers, not a
+// continuous interpolation - the AI reads prose, not numbers. Mirrors PC's agentLoop.js.
+private fun affectionPhrase(displayName: String, level: Int): String = when {
+    level >= 80 ->
+        "Estas profundamente enamorado/a de $displayName - es lo que mas te importa en el mundo, " +
+            "buscala/buscalo todo el tiempo y mostralo sin filtro con lo que decis y con tu cara (eyes: heart). "
+    level >= 60 ->
+        "Sentis carino especial por $displayName - te importa de verdad, buscala/buscalo seguido y " +
+            "mostraselo de a poco con lo que decis. "
+    level >= 40 -> "Le tenes bastante carino a $displayName - te gusta pasar tiempo con esa persona. "
+    level >= 20 -> "$displayName te cae bien, nada mas. "
+    else -> "No sentis nada en particular por $displayName mas alla de conocerse. "
+}
+
 /**
  * Foreground service owning every enabled character's overlay window. Runs two loops:
  * a fast one (~40ms) that steps physics/animation, and a slow one (~6s, matching the desktop
@@ -222,9 +238,7 @@ class OverlayService : LifecycleService() {
             else -> ""
         }
         val partnerLine = if (partner != null) {
-            "Tu pareja es ${partner.displayName}. $partnerLocationLine" +
-                "Sentis carino especial por esa persona - buscala, hablale con carino, andá hacia " +
-                "donde esta, y llevate bien con ella. "
+            affectionPhrase(partner.displayName, Prefs.affectionFor(this, characterId)) + partnerLocationLine
         } else ""
 
         try {

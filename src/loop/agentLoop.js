@@ -16,6 +16,33 @@ let paused = true;
 let timer = null;
 let ticking = false;
 
+// User-controlled 0-100 slider (settings.js, next to the partner dropdown) instead of a single
+// fixed "es tu pareja" phrase - lets the user dial a relationship anywhere from barely-registers
+// to head-over-heels rather than only on/off. Deliberately coarse tiers, not a continuous
+// interpolation - the AI reads prose, not numbers, so a handful of clearly distinct phrasings
+// works better than tiny wording deltas per point of the slider.
+function affectionPhrase(displayName, level) {
+  if (level >= 80) {
+    return (
+      `Estas profundamente enamorado/a de ${displayName} - es lo que mas te importa en el mundo, ` +
+      'buscala/buscalo todo el tiempo y mostralo sin filtro con lo que decis y con tu cara (eyes: heart). '
+    );
+  }
+  if (level >= 60) {
+    return (
+      `Sentis carino especial por ${displayName} - te importa de verdad, buscala/buscalo seguido y ` +
+      'mostraselo de a poco con lo que decis. '
+    );
+  }
+  if (level >= 40) {
+    return `Le tenes bastante carino a ${displayName} - te gusta pasar tiempo con esa persona. `;
+  }
+  if (level >= 20) {
+    return `${displayName} te cae bien, nada mas. `;
+  }
+  return `No sentis nada en particular por ${displayName} mas alla de conocerse. `;
+}
+
 // Last Paint OCR text seen by each character, keyed by character id - kept
 // separate per character so one friend's read_paint doesn't leak into
 // another's context.
@@ -151,10 +178,7 @@ async function tickCharacter(character, perception, userMessageText) {
             partnerPeer.device === 'tablet' ? ' (en la tablet)' : ''
           }. `
         : '';
-    const partnerLine = partner
-      ? `Tu pareja es ${partner.displayName}. ${partnerLocationLine}Sentis carino especial por esa persona - buscala, ` +
-        'hablale con carino, andá hacia donde esta, y llevate bien con ella. '
-      : '';
+    const partnerLine = partner ? affectionPhrase(partner.displayName, character.affectionLevel) + partnerLocationLine : '';
 
     const context = {
       characterId,

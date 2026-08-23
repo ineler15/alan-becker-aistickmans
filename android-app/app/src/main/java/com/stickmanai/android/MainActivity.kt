@@ -10,6 +10,7 @@ import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.SeekBar
 import android.widget.Spinner
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,6 +24,7 @@ class MainActivity : AppCompatActivity() {
     private val apiKeyFields = HashMap<String, EditText>()
     private val providerFields = HashMap<String, Spinner>()
     private val partnerFields = HashMap<String, Spinner>()
+    private val affectionFields = HashMap<String, SeekBar>()
 
     // First entry means "usar el compartido" (empty -> Prefs.providerFor falls back to shared).
     private val perCharacterProviderOptions = listOf("(compartido)") + Prefs.PROVIDERS
@@ -165,10 +167,27 @@ class MainActivity : AppCompatActivity() {
             }
             partnerFields[character.id] = partnerField
 
+            // How strong that affection is - a slider instead of just on/off, only meaningful
+            // once a target is picked above (disabled otherwise).
+            val affectionField = SeekBar(this).apply {
+                layoutParams = LinearLayout.LayoutParams((80 * resources.displayMetrics.density).toInt(), LinearLayout.LayoutParams.WRAP_CONTENT)
+                max = 100
+                progress = Prefs.affectionFor(this@MainActivity, character.id)
+                isEnabled = partnerField.selectedItemPosition != 0
+            }
+            partnerField.setOnItemSelectedListener(object : android.widget.AdapterView.OnItemSelectedListener {
+                override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {
+                    affectionField.isEnabled = position != 0
+                }
+                override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+            })
+            affectionFields[character.id] = affectionField
+
             row.addView(checkBox)
             row.addView(providerField)
             row.addView(apiKeyField)
             row.addView(partnerField)
+            row.addView(affectionField)
 
             // Only custom characters (see Prefs.customMeta) have appearance fields worth editing -
             // the vanilla/built-in ones (Red, TCO, etc.) don't get this button.
@@ -210,6 +229,9 @@ class MainActivity : AppCompatActivity() {
             val ids = spinner.tag as? List<String?>
             val selectedId = ids?.getOrNull(spinner.selectedItemPosition)
             Prefs.setPartnerFor(this, characterId, selectedId)
+        }
+        for ((characterId, seekBar) in affectionFields) {
+            Prefs.setAffectionFor(this, characterId, seekBar.progress)
         }
     }
 

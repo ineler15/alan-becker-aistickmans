@@ -72,6 +72,15 @@ object Prefs {
         sp(context).edit().putString("partner_$characterId", partnerId ?: "").apply()
     }
 
+    // How strong that affection is, 0-100, user-controlled via a SeekBar next to the partner
+    // Spinner - meaningless without partnerFor also set. Mirrors PC's perCharacterAffection.
+    fun affectionFor(context: Context, characterId: String): Int =
+        sp(context).getInt("affection_$characterId", 50)
+
+    fun setAffectionFor(context: Context, characterId: String, level: Int) {
+        sp(context).edit().putInt("affection_$characterId", level.coerceIn(0, 100)).apply()
+    }
+
     fun personality(context: Context, characterId: String): String =
         sp(context).getString("personality_$characterId", "") ?: ""
 

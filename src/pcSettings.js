@@ -25,6 +25,9 @@ function load() {
       // left to the emergent/optional "crush" behavior in the system prompts. One-directional -
       // set it on both characters for a mutual relationship.
       perCharacterPartner: {},
+      // How strong that affection is, 0-100, user-controlled via a slider next to the partner
+      // dropdown in settings.js - meaningless without a perCharacterPartner target set too.
+      perCharacterAffection: {},
       // No settings file yet (first run) - default to the same subset that used to be
       // hardcoded in characters.js, so behavior is unchanged until the user touches a checkbox.
       enabledIds: CHARACTERS.map((c) => c.id),
@@ -46,12 +49,16 @@ function applyEnabledCharacters(settings) {
   CHARACTERS.push(...chosen);
 }
 
-// Stamps each character's designated partner (if any) onto its CHARACTERS.ALL entry, same
-// "mutate in place, every module sees it live" pattern as the rest of this file - agentLoop.js
-// reads character.partnerId to build the personality line.
+// Stamps each character's designated affection target (if any) and how strong that affection is
+// (a user-controlled 0-100 slider, not just on/off) onto its CHARACTERS.ALL entry, same "mutate in
+// place, every module sees it live" pattern as the rest of this file - agentLoop.js reads
+// character.partnerId/affectionLevel to build the personality line. Level is meaningless without a
+// target, so it's only stamped when partnerId is actually set.
 function applyPartners(settings) {
   for (const character of CHARACTERS.ALL) {
     character.partnerId = (settings.perCharacterPartner || {})[character.id] || null;
+    const rawLevel = (settings.perCharacterAffection || {})[character.id];
+    character.affectionLevel = character.partnerId ? Math.min(100, Math.max(0, Number(rawLevel) || 50)) : 0;
   }
 }
 
