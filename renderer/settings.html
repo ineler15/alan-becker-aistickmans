@@ -95,6 +95,40 @@
         color: #888;
         margin-top: 4px;
       }
+      #contextModal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 10;
+        align-items: center;
+        justify-content: center;
+      }
+      #contextModal .box {
+        background: #242424;
+        border: 1px solid #444;
+        border-radius: 8px;
+        width: 420px;
+        max-width: 90vw;
+        padding: 16px;
+      }
+      #contextModal textarea {
+        width: 100%;
+        min-height: 120px;
+        box-sizing: border-box;
+        background: #2a2a2a;
+        color: #eee;
+        border: 1px solid #444;
+        border-radius: 6px;
+        padding: 8px;
+        font-size: 13px;
+        font-family: inherit;
+        resize: vertical;
+      }
+      #contextModal .modal-title {
+        font-size: 14px;
+        margin-bottom: 8px;
+      }
       button {
         margin-top: 16px;
         width: 100%;
@@ -123,6 +157,16 @@
       propio cupo gratuito en vez de compartir el de arriba.
     </div>
     <div id="charList"></div>
+    <div id="contextModal">
+      <div class="box">
+        <div class="modal-title" id="contextModalTitle"></div>
+        <label>Contexto extra para este personaje (se inyecta por separado del contexto automático)</label>
+        <textarea id="contextText" placeholder="Ej: le tiene miedo a las tormentas, tiene un plan de abrir una cafetería, hoy está de mal humor porque le fue mal..."></textarea>
+        <div class="hint">Lo lee el personaje todos los turnos, además del historial/peers/posición que ya recibe.</div>
+        <button id="contextSaveBtn" style="margin-top: 12px">Guardar contexto</button>
+        <button id="contextCancelBtn" style="margin-top: 8px; background: #444">Cancelar</button>
+      </div>
+    </div>
     <label style="display: flex; align-items: center; gap: 6px; margin-top: 16px; color: #eee">
       <input type="checkbox" id="allowMouseControl" style="width: auto; margin-top: 0" />
       Permitir que controlen el mouse/pantalla (mover el cursor, clickear, tocar)

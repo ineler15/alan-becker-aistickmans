@@ -241,6 +241,14 @@ class OverlayService : LifecycleService() {
             affectionPhrase(partner.displayName, Prefs.affectionFor(this, characterId)) + partnerLocationLine
         } else ""
 
+        // Extra context SEPARATE from the automatic one - user-written + character self-written
+        val userCtx = Prefs.userContext(this, characterId)
+        val selfCtx = Prefs.selfContext(this, characterId)
+        val extraContext = listOf(
+            if (userCtx.isNotBlank()) "Contexto que te escribio el usuario (se configura en la app, va fijo): $userCtx" else null,
+            if (selfCtx.isNotBlank()) "Contexto extra que vos mismo te escribiste con set_context: $selfCtx" else null,
+        ).filterNotNull().joinToString("\n\n")
+
         try {
             val decision = GeminiClient.decide(
                 apiKey = apiKey,
@@ -248,6 +256,7 @@ class OverlayService : LifecycleService() {
                 personality = genderLine + partnerLine + Prefs.personality(this, characterId),
                 recentHistory = overlay.recentHistory.toList(),
                 memory = Prefs.memory(this, characterId),
+                extraContext = extraContext,
                 xPercent = overlay.xPercent(metrics.widthPixels),
                 peers = peers,
                 userMessage = userMessage,
@@ -343,6 +352,7 @@ class OverlayService : LifecycleService() {
                 }
             }
             "define_personality" -> Prefs.setPersonality(this, overlay.def.id, args.optString("description", ""))
+            "set_context" -> Prefs.setSelfContext(this, overlay.def.id, args.optString("context", ""))
             "remember" -> Prefs.addMemory(this, overlay.def.id, args.optString("note", ""))
             "open_app" -> openUrl(args.optString("url", ""))
             "tap" -> {

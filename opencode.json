@@ -1,0 +1,22 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "memory/MEMORY.md",
+    "memory/project_overview.md",
+    "memory/android_screen_vision.md",
+    "memory/android_chat_and_movement.md",
+    "memory/android_idle_sway_and_repetition.md",
+    "memory/pc_settings_window.md",
+    "memory/pc_engine_replacement.md",
+    "memory/installer_stale_no_window.md",
+    "memory/gemini_quota_per_project.md",
+    "memory/android_multi_provider_mode.md",
+    "memory/android_rig_renderer.md",
+    "memory/pc_per_character_provider.md",
+    "memory/sleep_tiredness_system.md",
+    "memory/custom_character_creator.md",
+    "memory/sn_proto_wasm_renderer.md",
+    "memory/windows_dev_workflow.md",
+    "memory/feedback_workflow_style.md"
+  ]
+}

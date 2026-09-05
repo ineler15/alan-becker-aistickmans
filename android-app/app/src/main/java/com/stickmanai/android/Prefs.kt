@@ -88,6 +88,24 @@ object Prefs {
         sp(context).edit().putString("personality_$characterId", value).apply()
     }
 
+    // USER-written extra context for a character (set from MainActivity's "Contexto" button) -
+    // injected SEPARATE from the automatic context, mirrors PC's perCharacterContext.
+    fun userContext(context: Context, characterId: String): String =
+        sp(context).getString("user_context_$characterId", "") ?: ""
+
+    fun setUserContext(context: Context, characterId: String, value: String) {
+        sp(context).edit().putString("user_context_$characterId", value).apply()
+    }
+
+    // Context the character wrote FOR ITSELF via the set_context action (persisted so it survives
+    // restarts) - separate from personality/memory, mirrors PC's workspace context-<id>.json.
+    fun selfContext(context: Context, characterId: String): String =
+        sp(context).getString("self_context_$characterId", "") ?: ""
+
+    fun setSelfContext(context: Context, characterId: String, value: String) {
+        sp(context).edit().putString("self_context_$characterId", value).apply()
+    }
+
     fun memory(context: Context, characterId: String): List<String> {
         val raw = sp(context).getString("memory_$characterId", "") ?: ""
         return if (raw.isBlank()) emptyList() else raw.split(MEMORY_SEP)

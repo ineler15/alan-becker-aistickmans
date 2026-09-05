@@ -28,6 +28,10 @@ function load() {
       // How strong that affection is, 0-100, user-controlled via a slider next to the partner
       // dropdown in settings.js - meaningless without a perCharacterPartner target set too.
       perCharacterAffection: {},
+      // Extra context written by the USER for a character (editable via the "Contexto" button in
+      // the settings window) - injected into the AI prompt SEPARATE from the automatic context
+      // (history/peers/status/etc.). Same map shape as perCharacterPartner: id -> text.
+      perCharacterContext: {},
       // No settings file yet (first run) - default to the same subset that used to be
       // hardcoded in characters.js, so behavior is unchanged until the user touches a checkbox.
       enabledIds: CHARACTERS.map((c) => c.id),
@@ -59,6 +63,17 @@ function applyPartners(settings) {
     character.partnerId = (settings.perCharacterPartner || {})[character.id] || null;
     const rawLevel = (settings.perCharacterAffection || {})[character.id];
     character.affectionLevel = character.partnerId ? Math.min(100, Math.max(0, Number(rawLevel) || 50)) : 0;
+  }
+}
+
+// Stamps each character's USER-WRITTEN extra context (the "Contexto" button in the settings
+// window) onto its CHARACTERS.ALL entry, same "mutate in place, every module sees it live" pattern
+// as applyPartners - agentLoop.js reads character.userContext to build the extraContext line it
+// injects SEPARATE from the automatic context. This is distinct from the context a character
+// writes for itself via the set_context action (persisted in workspace context-<id>.json).
+function applyContexts(settings) {
+  for (const character of CHARACTERS.ALL) {
+    character.userContext = ((settings.perCharacterContext || {})[character.id] || '').trim();
   }
 }
 
@@ -109,5 +124,6 @@ module.exports = {
   applyToEnv,
   applyEnabledCharacters,
   applyPartners,
+  applyContexts,
   SETTINGS_PATH,
 };

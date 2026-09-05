@@ -286,6 +286,7 @@ app.whenReady().then(() => {
     pcSettings.applyToEnv(settings);
     pcSettings.applyEnabledCharacters(settings);
     pcSettings.applyPartners(settings);
+    pcSettings.applyContexts(settings);
     if (settingsWindow) settingsWindow.close();
     startCharacterEngine();
     agentLoop.start();

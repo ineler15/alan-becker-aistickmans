@@ -112,6 +112,19 @@ object ActionsSchema {
                 listOf("note")
             )
         )
+        put(
+            tool(
+                "set_context",
+                "Define o actualiza, en tus propias palabras, un contexto propio extra que quieras que " +
+                    "se siga aplicando en el futuro. Esto es DISTINTO del contexto automatico que ya " +
+                    "recibis cada turno (historial, tus peers, tu posicion, etc.) - aca va lo que VOS " +
+                    "queres que se recuerde sobre ti o tu situacion mas alla de eso: tus planes, tu " +
+                    "historia, como ves las cosas, relaciones entre hechos. Se guarda y lo vas a seguir " +
+                    "viendo en turnos futuros, incluso despues de reiniciar.",
+                withFaceParams(JSONObject().put("context", prop("string", "Tu contexto extra, en tus palabras"))),
+                listOf("context")
+            )
+        )
         put(tool("wait", "No haces nada este turno. Reservalo para turnos excepcionales.", withFaceParams(JSONObject())))
         put(
             tool(

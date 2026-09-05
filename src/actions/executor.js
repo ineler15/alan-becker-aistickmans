@@ -139,6 +139,8 @@ async function execute(name, args, characterId) {
     }
     case 'define_personality':
       return { ok: true, result: String(args.description || '').slice(0, 500) };
+    case 'set_context':
+      return { ok: true, result: String(args.context || '').slice(0, 1000) };
     case 'remember':
       return { ok: true, result: String(args.note || '').slice(0, 300) };
     default:

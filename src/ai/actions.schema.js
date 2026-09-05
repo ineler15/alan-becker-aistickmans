@@ -182,6 +182,18 @@ const ACTIONS = [
     risky: false,
   },
   {
+    name: 'set_context',
+    desc:
+      'Define o actualiza, en tus propias palabras, un contexto propio extra que quieras que se ' +
+      'siga aplicando en el futuro. Esto es DISTINTO del contexto automatico que ya recibis cada ' +
+      'turno (historial, tus peers, tu posicion, etc.) - aca va lo que VOS queres que se recuerde ' +
+      'sobre ti o tu situacion mas alla de eso: tus planes, tu historia, como ves las cosas, ' +
+      'relaciones entre hechos. Se guarda y lo vas a seguir viendo en turnos futuros, incluso ' +
+      'despues de reiniciar.',
+    params: { context: 'string' },
+    risky: false,
+  },
+  {
     name: 'remember',
     desc:
       'Anota algo que quieras recordar a largo plazo (un dato del usuario, algo que aprendiste, algo ' +

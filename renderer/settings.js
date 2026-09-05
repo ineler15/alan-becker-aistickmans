@@ -20,6 +20,8 @@ let providerSelects = {};
 let checkboxes = {};
 let partnerSelects = {};
 let affectionInputs = {};
+let contextInputs = {};
+let editingContextId = null;
 
 async function renderCharacterList(providers) {
   const { characters, settings } = await window.stickmanAPI.getPcSettings();
@@ -30,10 +32,12 @@ async function renderCharacterList(providers) {
   checkboxes = {};
   partnerSelects = {};
   affectionInputs = {};
+  contextInputs = {};
   const enabledIds = new Set(settings.enabledIds || []);
   const perCharacterProvider = settings.perCharacterProvider || {};
   const perCharacterPartner = settings.perCharacterPartner || {};
   const perCharacterAffection = settings.perCharacterAffection || {};
+  const perCharacterContext = settings.perCharacterContext || {};
   for (const c of characters) {
     const row = document.createElement('div');
     row.className = 'char-row';
@@ -124,8 +128,25 @@ async function renderCharacterList(providers) {
       row.appendChild(editBtn);
     }
 
+    const contextBtn = document.createElement('button');
+    contextBtn.textContent = 'Contexto';
+    contextBtn.type = 'button';
+    contextBtn.addEventListener('click', () => openContextEditor(c));
+    row.appendChild(contextBtn);
+
+    // Seed this character's saved user-context so openContextEditor() can prefill it. Stored as
+    // a plain string map (not a DOM input) - it only changes through the modal.
+    contextInputs[c.id] = perCharacterContext[c.id] || '';
+
     charList.appendChild(row);
   }
+}
+
+function openContextEditor(c) {
+  editingContextId = c.id;
+  document.getElementById('contextModalTitle').textContent = `Contexto de ${c.displayName}`;
+  document.getElementById('contextText').value = contextInputs[c.id] || '';
+  document.getElementById('contextModal').style.display = 'flex';
 }
 
 async function init() {
@@ -142,6 +163,16 @@ async function init() {
 
   document.getElementById('sharedKey').value = collapseRepeatedKey(settings.sharedApiKey || '');
   document.getElementById('allowMouseControl').checked = !!settings.allowMouseControl;
+
+  document.getElementById('contextSaveBtn').addEventListener('click', () => {
+    if (editingContextId) {
+      contextInputs[editingContextId] = document.getElementById('contextText').value.trim();
+    }
+    document.getElementById('contextModal').style.display = 'none';
+  });
+  document.getElementById('contextCancelBtn').addEventListener('click', () => {
+    document.getElementById('contextModal').style.display = 'none';
+  });
 
   await renderCharacterList(providers);
 
@@ -160,6 +191,10 @@ async function init() {
     for (const id in partnerSelects) perCharacterPartnerOut[id] = partnerSelects[id].value;
     const perCharacterAffectionOut = {};
     for (const id in affectionInputs) perCharacterAffectionOut[id] = Number(affectionInputs[id].value);
+    const perCharacterContextOut = {};
+    for (const id in contextInputs) {
+      if (contextInputs[id]) perCharacterContextOut[id] = contextInputs[id];
+    }
     const enabled = Object.keys(checkboxes).filter((id) => checkboxes[id].checked);
     window.stickmanAPI.savePcSettings({
       provider: providerSelect.value,
@@ -168,6 +203,7 @@ async function init() {
       perCharacterProvider: perCharacterProviderOut,
       perCharacterPartner: perCharacterPartnerOut,
       perCharacterAffection: perCharacterAffectionOut,
+      perCharacterContext: perCharacterContextOut,
       enabledIds: enabled,
       allowMouseControl: document.getElementById('allowMouseControl').checked,
     });

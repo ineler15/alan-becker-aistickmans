@@ -7,6 +7,7 @@ const shimeji = require('../jsEngine/jsShimejiController');
 const CHARACTERS = require('../characters');
 const userMessage = require('./userMessage');
 const selfPersonality = require('../memory/selfPersonality');
+const characterContext = require('../memory/characterContext');
 const notes = require('../memory/notes');
 const webcam = require('./webcam');
 const peerServer = require('../net/peerServer');
@@ -180,6 +181,20 @@ async function tickCharacter(character, perception, userMessageText) {
         : '';
     const partnerLine = partner ? affectionPhrase(partner.displayName, character.affectionLevel) + partnerLocationLine : '';
 
+    // Extra context SEPARATE from the automatic one (history/peers/status/etc.) - two sources
+    // combined here: what the USER wrote for this character (settings window's "Contexto" button,
+    // stamped onto character.userContext by pcSettings.applyContexts) and what the character wrote
+    // for ITSELF via the set_context action (persisted in workspace context-<id>.json). Empty when
+    // there's nothing written, so providers only see the field when it actually has content.
+    const userCtx = character.userContext || '';
+    const selfCtx = characterContext.load(characterId);
+    const extraContext = [
+      userCtx ? `Contexto que te escribio el usuario (se configura en la app, va fijo): ${userCtx}` : '',
+      selfCtx ? `Contexto extra que vos mismo te escribiste con set_context: ${selfCtx}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
     const context = {
       characterId,
       recentHistory: history.recent(characterId, 8),
@@ -197,6 +212,7 @@ async function tickCharacter(character, perception, userMessageText) {
           character.personality ||
           'Todavia no definiste tu propia personalidad. Cuando quieras, usa define_personality para ' +
             'decidir en tus propias palabras como sos.'),
+      extraContext,
       peers,
       userMessage: userMessageText || null,
       forceSay: (turnsSinceSayById.get(characterId) || 0) >= SILENT_TURN_LIMIT,
@@ -256,6 +272,9 @@ async function tickCharacter(character, perception, userMessageText) {
     }
     if (tool === 'define_personality' && ok && typeof result === 'string' && result.trim()) {
       selfPersonality.set(characterId, result.trim());
+    }
+    if (tool === 'set_context' && ok && typeof result === 'string' && result.trim()) {
+      characterContext.set(characterId, result.trim());
     }
     if (tool === 'remember' && ok && typeof result === 'string' && result.trim()) {
       notes.add(characterId, result.trim());

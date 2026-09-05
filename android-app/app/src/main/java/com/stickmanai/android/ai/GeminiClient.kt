@@ -53,6 +53,11 @@ object GeminiClient {
         Si todavia no definiste tu personalidad, hacelo vos mismo con define_personality (pocas
         palabras, casual, sin dramatismo) - vos decidis como sos.
         Usa remember solo para notas que de verdad valga la pena recordar despues.
+        Usa set_context (raramente, no todo el tiempo) para definir en tus propias palabras un
+        contexto propio extra que quieras que se siga recordando: tus planes, tu historia, como ves
+        las cosas, relaciones entre hechos. Es distinto del contexto automatico que ya recibis
+        (historial, peers, posicion) y de tu personalidad (define_personality) - va a lo que VOS
+        queres fijar sobre ti o tu situacion.
         Si tenes cara propia (se eligio al crearte - no todos la tienen), CUALQUIER accion que
         elijas (say, walk_to, set_animation, etc.) acepta ademas los parametros opcionales eyes
         (normal/wide/angry/heart) y mouth (neutral/smile/frown/open/angry) para que tu cara
@@ -115,6 +120,7 @@ object GeminiClient {
         personality: String,
         recentHistory: List<String>,
         memory: List<String>,
+        extraContext: String = "",
         xPercent: Int,
         peers: List<PeerInfo>,
         userMessage: String?,
@@ -126,6 +132,7 @@ object GeminiClient {
             .put("xPercent", xPercent)
             .put("recentHistory", JSONArray(recentHistory))
             .put("memory", JSONArray(memory))
+            .apply { if (extraContext.isNotBlank()) put("extraContext", extraContext) }
             .put(
                 "peers",
                 JSONArray(peers.map {

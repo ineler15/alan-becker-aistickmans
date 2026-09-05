@@ -25,6 +25,8 @@ class MainActivity : AppCompatActivity() {
     private val providerFields = HashMap<String, Spinner>()
     private val partnerFields = HashMap<String, Spinner>()
     private val affectionFields = HashMap<String, SeekBar>()
+    private val contextValues = HashMap<String, String>()
+    private val contextFields = HashMap<String, Button>()
 
     // First entry means "usar el compartido" (empty -> Prefs.providerFor falls back to shared).
     private val perCharacterProviderOptions = listOf("(compartido)") + Prefs.PROVIDERS
@@ -183,11 +185,42 @@ class MainActivity : AppCompatActivity() {
             })
             affectionFields[character.id] = affectionField
 
+            contextValues[character.id] = Prefs.userContext(this@MainActivity, character.id)
+
+            val contextButton = Button(this).apply {
+                text = "Contexto"
+                textSize = 11f
+                minimumWidth = 0
+                minimumHeight = 0
+                setPadding(8, 4, 8, 4)
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                setOnClickListener {
+                    val input = EditText(this@MainActivity).apply {
+                        hint = "Contexto extra para este personaje"
+                        setText(contextValues[character.id] ?: "")
+                        setSelectAllOnFocus(true)
+                        minLines = 3
+                    }
+                    android.app.AlertDialog.Builder(this@MainActivity)
+                        .setTitle("Contexto de ${character.displayName}")
+                        .setMessage("Se inyecta por separado del contexto automatico (historial, peers, posicion). Lo lee todos los turnos.")
+                        .setView(input)
+                        .setPositiveButton("Guardar") { _, _ ->
+                            contextValues[character.id] = input.text.toString().trim()
+                            Prefs.setUserContext(this@MainActivity, character.id, contextValues[character.id]!!)
+                        }
+                        .setNegativeButton("Cancelar", null)
+                        .show()
+                }
+            }
+            contextFields[character.id] = contextButton
+
             row.addView(checkBox)
             row.addView(providerField)
             row.addView(apiKeyField)
             row.addView(partnerField)
             row.addView(affectionField)
+            row.addView(contextButton)
 
             // Only custom characters (see Prefs.customMeta) have appearance fields worth editing -
             // the vanilla/built-in ones (Red, TCO, etc.) don't get this button.
@@ -232,6 +265,9 @@ class MainActivity : AppCompatActivity() {
         }
         for ((characterId, seekBar) in affectionFields) {
             Prefs.setAffectionFor(this, characterId, seekBar.progress)
+        }
+        for ((characterId, text) in contextValues) {
+            Prefs.setUserContext(this, characterId, text)
         }
     }
 

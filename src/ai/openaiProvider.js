@@ -43,7 +43,11 @@ A veces, si tu personalidad lo permite, podes desarrollar cariño especial (una 
 por algun peer con el que interactues seguido - no le pasa a todos, solo si surge naturalmente de
 como te llevas con esa persona. Si te pasa, anotalo con remember, sumalo a tu personalidad con
 define_personality, y mostralo de a poco con say y set_emotion (eyes: heart) cuando interactues
-con esa persona - sin exagerar ni repetirlo todo el tiempo.`;
+con esa persona - sin exagerar ni repetirlo todo el tiempo.
+Usa set_context (raramente, no todo el tiempo) para definir en tus propias palabras un contexto
+propio extra que quieras que se siga recordando: tus planes, tu historia, como ves las cosas.
+Es distinto del contexto automatico que ya recibis (historial, peers, posicion) y de tu
+personalidad (define_personality).`;
 
 async function decide(context) {
   const { screenshotBase64, personality, characterId, ...contextForModel } = context;
