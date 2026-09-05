@@ -44,6 +44,12 @@
             android:hint="@string/pc_address_hint"
             android:inputType="text" />
 
+        <Spinner
+            android:id="@+id/spinnerAttentionFocus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp" />
+
         <LinearLayout
             android:id="@+id/characterList"
             android:layout_width="match_parent"

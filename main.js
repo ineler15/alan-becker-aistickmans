@@ -21,6 +21,7 @@ customCharacters.loadIntoRoster();
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
+  return;
 }
 
 // Clears each character's short-term state (position/pose, recent action log) on every launch
@@ -222,6 +223,10 @@ app.whenReady().then(() => {
   resetShortTermState();
   createIconWindow();
   createWebcamWindow();
+
+  // "Salir" button on the pre-launch settings window - lets the user close the program from
+  // the startup menu instead of only continuing into the character engine.
+  ipcMain.on('stickman:close-app', () => app.quit());
 
   ipcMain.on('stickman:icon-ready', (_event, dataURL) => {
     setAppIcon(dataURL);

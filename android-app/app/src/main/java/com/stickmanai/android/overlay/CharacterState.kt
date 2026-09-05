@@ -10,18 +10,20 @@ import kotlin.random.Random
 class CharacterState(private val screenWidth: Int, private val screenHeight: Int, private val floorY: Int) {
 
     companion object {
-        const val TICK_MS = 40L
-        const val WALK_SPEED = 3
-        const val RUN_SPEED = 7
-        const val WALK_FRAME_TICKS = 4
-        const val RUN_FRAME_TICKS = 2
-        const val FALL_SPEED = 6
-        const val FALL_FRAME_TICKS = 3
+        // Velocity/frame ticks scaled to match the faster 25ms tick (40->25 = 0.625x) so real-time
+        // walk/run/fall/climb cadence stays the same while poses arrive ~40 times/sec instead of 25.
+        const val TICK_MS = 25L
+        const val WALK_SPEED = 2
+        const val RUN_SPEED = 4
+        const val WALK_FRAME_TICKS = 6
+        const val RUN_FRAME_TICKS = 3
+        const val FALL_SPEED = 4
+        const val FALL_FRAME_TICKS = 5
         const val FALL_TIMEOUT_MS = 4000L
         const val SAY_DURATION_MIN_MS = 8000L
         const val SAY_DURATION_PER_CHAR_MS = 90L
-        const val CLIMB_SPEED = 3
-        const val CLIMB_FRAME_TICKS = 4
+        const val CLIMB_SPEED = 2
+        const val CLIMB_FRAME_TICKS = 6
         private const val EDGE_MARGIN = 4
         // Tiredness: forced to sleep either after being awake too long, or (with a shorter
         // threshold) if it's nighttime - matches the desktop's existing sleep/tired AIBehavior.java

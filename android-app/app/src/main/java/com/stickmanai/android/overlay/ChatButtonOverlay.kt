@@ -8,18 +8,21 @@ import android.view.View
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.Spinner
 import android.widget.TextView
+import com.stickmanai.android.allCharacters
 
 /**
  * A small always-on-top "chat" button fixed at the top-right corner, plus the floating text-entry
  * panel it opens. Replaces the old per-character tap-to-chat flow (which launched a full
  * ChatActivity and switched away from whatever app the user was using) - this stays an overlay the
  * whole time, like the character/speech overlays, so answering never leaves the app in front.
- * Sends to everyone (same recipient as MainActivity's existing "hablarle a todos" group chat),
- * since there's one shared button instead of one per character.
+ * The panel has a recipient picker: "(a todos)" group chat, or ONE specific character (private
+ * chat via PendingMessages.set) - the per-character path the old group-only overlay lacked.
  */
 class ChatButtonOverlay(private val context: Context, private val windowManager: WindowManager) {
 
@@ -33,8 +36,19 @@ class ChatButtonOverlay(private val context: Context, private val windowManager:
         setTextColor(Color.WHITE)
     }
 
+    // Recipient picker: null (position 0) = group chat to everyone, otherwise one character id.
+    private val recipientIds = mutableListOf<String?>(null)
+    private val recipientSpinner = Spinner(context).apply {
+        val labels = mutableListOf("(a todos)")
+        for (character in allCharacters(context)) {
+            recipientIds.add(character.id)
+            labels.add(character.displayName)
+        }
+        adapter = ArrayAdapter(context, android.R.layout.simple_spinner_dropdown_item, labels)
+    }
+
     private val editText = EditText(context).apply {
-        hint = "Escribile algo a todos..."
+        hint = "Escribile algo..."
         setBackgroundColor(Color.WHITE)
         imeOptions = EditorInfo.IME_ACTION_SEND
         setSingleLine()
@@ -46,18 +60,28 @@ class ChatButtonOverlay(private val context: Context, private val windowManager:
 
     // Just a friendly nudge through the normal chat pipeline - the character reacts in its own
     // voice/personality via say + set_emotion (already wired up), not a hardcoded canned response.
+    // Sent to whichever recipient is selected (group or one character).
     private val giveSnackButton = Button(context).apply {
         text = "🍪"
     }
 
-    private val panel = LinearLayout(context).apply {
+    private val contentRow = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
-        setBackgroundColor(Color.parseColor("#EEFFFFFF"))
-        val pad = (8 * density).toInt()
-        setPadding(pad, pad, pad, pad)
         addView(editText, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         addView(sendButton)
         addView(giveSnackButton)
+    }
+
+    private val panel = LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
+        setBackgroundColor(Color.parseColor("#EEFFFFFF"))
+        val pad = (8 * density).toInt()
+        setPadding(pad, pad, pad, pad)
+        addView(
+            recipientSpinner,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT),
+        )
+        addView(contentRow)
         visibility = View.GONE
     }
 
@@ -89,8 +113,19 @@ class ChatButtonOverlay(private val context: Context, private val windowManager:
         button.setOnClickListener { togglePanel() }
         sendButton.setOnClickListener { send() }
         giveSnackButton.setOnClickListener {
-            PendingMessages.setAll(context, "🍪 Te acaban de regalar un alfajor. ¡Disfrutalo!")
-            hidePanel()
+            sendToRecipient("🍪 Te acaban de regalar un alfajor. ¡Disfrutalo!")
+        }
+        recipientSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val recipientId = recipientIds.getOrNull(position)
+                editText.hint = if (recipientId == null) {
+                    "Escribile algo a todos..."
+                } else {
+                    val name = allCharacters(context).find { it.id == recipientId }?.displayName ?: recipientId
+                    "Escribile algo a $name (privado)..."
+                }
+            }
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
         }
         editText.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEND) {
@@ -131,10 +166,17 @@ class ChatButtonOverlay(private val context: Context, private val windowManager:
         windowManager.updateViewLayout(panel, panelParams)
     }
 
+    private fun selectedRecipient(): String? = recipientIds.getOrNull(recipientSpinner.selectedItemPosition)
+
+    private fun sendToRecipient(text: String) {
+        val recipient = selectedRecipient()
+        if (recipient == null) PendingMessages.setAll(context, text) else PendingMessages.set(recipient, text)
+    }
+
     private fun send() {
         val text = editText.text.toString().trim()
         if (text.isNotEmpty()) {
-            PendingMessages.setAll(context, text)
+            sendToRecipient(text)
             editText.setText("")
         }
         hidePanel()

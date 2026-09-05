@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('stickmanAPI', {
   },
   getPcSettings: () => ipcRenderer.invoke('stickman:get-settings'),
   savePcSettings: (settings) => ipcRenderer.send('stickman:save-settings', settings),
+  quitApp: () => ipcRenderer.send('stickman:close-app'),
   onCharactersUpdated: (callback) => {
     ipcRenderer.on('stickman:characters-updated', () => callback());
   },

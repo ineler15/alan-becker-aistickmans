@@ -151,6 +151,12 @@
     <select id="provider"></select>
     <label>API key compartida (para el proveedor de arriba)</label>
     <input id="sharedKey" type="password" placeholder="Opcional si cada uno tiene la suya" />
+    <label>A qué prestarle más atención (afecta a todos)</label>
+    <select id="attentionFocus">
+      <option value="camera">Cámara (la webcam)</option>
+      <option value="mouse">Mouse (seguir el cursor)</option>
+    </select>
+    <div class="hint">Solo cambia el énfasis en el prompt - en ambos modos los personajes siguen viendo la cámara y la pantalla.</div>
     <div class="hint">
       Tildá los personajes que querés que aparezcan. Cada uno puede usar el proveedor
       compartido de arriba ("compartido") o su propio proveedor + API key, para tener su
@@ -173,6 +179,7 @@
     </label>
     <div class="hint">Desactivado por defecto - un personaje con esto activado puede mover tu cursor de verdad.</div>
     <button id="createCharacterBtn" style="background: #444">+ Crear mi propio stickman</button>
+    <button id="exitBtn" style="background: #771515">Salir (cerrar el programa)</button>
     <button id="continueBtn">Guardar y continuar</button>
     <script src="settings.js"></script>
   </body>

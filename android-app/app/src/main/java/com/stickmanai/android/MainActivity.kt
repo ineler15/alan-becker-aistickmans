@@ -31,6 +31,10 @@ class MainActivity : AppCompatActivity() {
     // First entry means "usar el compartido" (empty -> Prefs.providerFor falls back to shared).
     private val perCharacterProviderOptions = listOf("(compartido)") + Prefs.PROVIDERS
 
+    // Global attention preference shared by every character: watch the webcam (camera) or watch
+    // where the user is touching the screen (touch). Mirrors PC's attentionFocus selector.
+    private val attentionOptions = listOf("Camara (webcam)", "Donde toco la pantalla")
+
     private val requestNotificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { /* no-op either way */ }
 
@@ -52,6 +56,8 @@ class MainActivity : AppCompatActivity() {
         binding.checkAllowScreenControl.setOnCheckedChangeListener { _, checked ->
             Prefs.setAllowScreenControl(this, checked)
         }
+        binding.spinnerAttentionFocus.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, attentionOptions)
+        binding.spinnerAttentionFocus.setSelection(if (Prefs.attentionFocus(this) == "touch") 1 else 0)
 
         buildCharacterRows()
 
@@ -250,6 +256,7 @@ class MainActivity : AppCompatActivity() {
         Prefs.setSharedProvider(this, binding.spinnerSharedProvider.selectedItem as String)
         Prefs.setSharedApiKey(this, binding.editSharedApiKey.text.toString().trim())
         Prefs.setPcAddress(this, binding.editPcAddress.text.toString().trim())
+        Prefs.setAttentionFocus(this, if (binding.spinnerAttentionFocus.selectedItemPosition == 1) "touch" else "camera")
         for ((characterId, field) in apiKeyFields) {
             Prefs.setApiKeyFor(this, characterId, field.text.toString().trim())
         }

@@ -6,13 +6,16 @@
 // IPC to that character's own renderer window, which turns it into actual bone angles (see
 // renderer/poseLibrary.js).
 
-const TICK_MS = 40;
-const WALK_SPEED = 3;
-const RUN_SPEED = 7;
-const WALK_FRAME_TICKS = 4;
-const RUN_FRAME_TICKS = 2;
-const FALL_SPEED = 6;
-const FALL_FRAME_TICKS = 3;
+const TICK_MS = 25;
+// Speeds/frame-ticks scaled down/up to match the faster 25ms tick (40->25 = 0.625x) so real-time
+// walk/run/fall cadence stays the same as before while every animation reads much smoother - the
+// renderer now gets a fresh pose 40 times/sec instead of 25.
+const WALK_SPEED = 2;
+const RUN_SPEED = 4;
+const WALK_FRAME_TICKS = 6;
+const RUN_FRAME_TICKS = 3;
+const FALL_SPEED = 4;
+const FALL_FRAME_TICKS = 5;
 const FALL_TIMEOUT_MS = 4000;
 const SAY_DURATION_MIN_MS = 8000;
 const SAY_DURATION_PER_CHAR_MS = 90;

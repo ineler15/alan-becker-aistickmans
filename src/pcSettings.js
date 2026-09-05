@@ -39,6 +39,10 @@ function load() {
       // bigger deal than any of the sandboxed actions (StickPaint, walking, etc.), so it needs an
       // explicit opt-in rather than working out of the box like everything else.
       allowMouseControl: false,
+      // Where the AI should pay more attention each decision turn: 'camera' (the webcam frame)
+      // or 'mouse' (the cursor's position, tracked via input.getMousePosition). Global, not per
+      // character - it only changes the emphasis in the prompt, both signals keep coming in.
+      attentionFocus: 'camera',
     };
   }
 }
@@ -95,6 +99,7 @@ const KEY_ENV_VAR = {
 // see config.gemini.apiKeyFor) picks them up with no changes to that code at all.
 function applyToEnv(settings) {
   process.env.ALLOW_MOUSE_CONTROL = settings.allowMouseControl ? '1' : '0';
+  process.env.ATTENTION_FOCUS = settings.attentionFocus === 'mouse' ? 'mouse' : 'camera';
   if (settings.provider) process.env.AI_PROVIDER = settings.provider;
   const keyEnvVar = KEY_ENV_VAR[settings.provider];
   if (keyEnvVar && settings.sharedApiKey) process.env[keyEnvVar] = settings.sharedApiKey;

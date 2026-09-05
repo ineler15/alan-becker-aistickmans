@@ -263,6 +263,9 @@ class OverlayService : LifecycleService() {
                 forceSay = silentStreak >= SILENT_TURN_LIMIT,
                 cameraBase64 = cameraBase64,
                 screenBase64 = screenBase64,
+                attentionFocus = Prefs.attentionFocus(this@OverlayService),
+                touchXPercent = if (TouchTracker.isKnown()) TouchTracker.xPercent else null,
+                touchYPercent = if (TouchTracker.isKnown()) TouchTracker.yPercent else null,
             )
             val (tool, args) = dedupeRepeatedAction(characterId, decision.tool, decision.args)
             // Captured from the ORIGINAL decision (before the repeat-guard above can swap

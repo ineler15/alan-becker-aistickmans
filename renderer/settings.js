@@ -163,6 +163,7 @@ async function init() {
 
   document.getElementById('sharedKey').value = collapseRepeatedKey(settings.sharedApiKey || '');
   document.getElementById('allowMouseControl').checked = !!settings.allowMouseControl;
+  document.getElementById('attentionFocus').value = settings.attentionFocus === 'mouse' ? 'mouse' : 'camera';
 
   document.getElementById('contextSaveBtn').addEventListener('click', () => {
     if (editingContextId) {
@@ -180,6 +181,10 @@ async function init() {
 
   document.getElementById('createCharacterBtn').addEventListener('click', () => {
     window.stickmanAPI.openCreateCharacterWindow();
+  });
+
+  document.getElementById('exitBtn').addEventListener('click', () => {
+    window.stickmanAPI.quitApp();
   });
 
   document.getElementById('continueBtn').addEventListener('click', () => {
@@ -206,6 +211,7 @@ async function init() {
       perCharacterContext: perCharacterContextOut,
       enabledIds: enabled,
       allowMouseControl: document.getElementById('allowMouseControl').checked,
+      attentionFocus: document.getElementById('attentionFocus').value,
     });
   });
 }

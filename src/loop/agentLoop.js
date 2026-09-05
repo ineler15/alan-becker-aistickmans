@@ -12,6 +12,7 @@ const notes = require('../memory/notes');
 const webcam = require('./webcam');
 const peerServer = require('../net/peerServer');
 const health = require('./health');
+const inputCtl = require('../actions/input');
 
 let paused = true;
 let timer = null;
@@ -120,7 +121,7 @@ function purposefulWalkTarget(perception, status) {
   };
 }
 
-async function tickCharacter(character, perception, userMessageText) {
+async function tickCharacter(character, perception, userMessageText, mousePosition) {
   const { id: characterId } = character;
   try {
     const provider = getProvider(characterId);
@@ -205,6 +206,15 @@ async function tickCharacter(character, perception, userMessageText) {
       activeWindow: perception ? perception.activeWindow : null,
       screenshotBase64,
       webcamBase64: webcam.get(),
+      // Where the user's real cursor is right now (absolute screen pixels, captured once per
+      // round in tick()) + the global attention preference - the model should steer its gaze:
+      // 'mouse' = follow/watch the cursor, 'camera' = keep attention on the webcam frame.
+      ...(mousePosition ? { mousePosition } : {}),
+      attentionFocus: config.attentionFocus,
+      attentionNote:
+        config.attentionFocus === 'mouse'
+          ? 'ATENCION: tu principal foco ahora es el mouse del usuario. Mirá donde esta el cursor (mousePosition) y reacciona: segui su movimiento, comentalo, divertite/cerca de el. La camara y la pantalla siguen llegando, pero el cursor es lo importante.'
+          : 'ATENCION: tu principal foco ahora es la camara webcam (la persona mirandote). Prestale mas atencion a la foto/imagen de la persona que a la posicion del cursor - la posicion del mouse (mousePosition) te llega igual, pero no es tu prioridad.',
       personality:
         genderLine +
         partnerLine +
@@ -313,6 +323,10 @@ async function tick() {
   // out of it below, so the cost doesn't multiply with the number of friends.
   const perception = await withTimeout(capturePerception(), 20000, 'capturePerception').catch(() => null);
 
+  // One shared read of the cursor per round too - same "don't multiply per friend" reasoning,
+  // and cheap enough that a failure just means mousePosition stays absent this round.
+  const mousePosition = await inputCtl.getMousePosition().catch(() => null);
+
   // Sequential and staggered on purpose: back-to-back calls for several
   // characters would burn the whole per-minute token budget in one round.
   for (let i = 0; i < CHARACTERS.length; i++) {
@@ -340,7 +354,7 @@ async function tick() {
       continue;
     }
 
-    await tickCharacter(character, perception, pendingUserMessage);
+    await tickCharacter(character, perception, pendingUserMessage, mousePosition);
     if (i < CHARACTERS.length - 1 && config.characterStaggerMs > 0) await delay(config.characterStaggerMs);
   }
 

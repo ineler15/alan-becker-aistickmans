@@ -123,6 +123,11 @@ const config = {
   get allowMouseControl() {
     return process.env.ALLOW_MOUSE_CONTROL === '1';
   },
+  // Global attention preference injected into the AI context every turn: 'camera' (pay more
+  // attention to the webcam frame) or 'mouse' (pay more attention to the cursor position).
+  get attentionFocus() {
+    return process.env.ATTENTION_FOCUS === 'mouse' ? 'mouse' : 'camera';
+  },
   stickmanColor: process.env.STICKMAN_COLOR || '#111111',
   shimeji: {
     javaPath: process.env.SHIMEJI_JAVA_PATH || 'C:\\Program Files (x86)\\Java\\jre1.8.0_501\\bin\\javaw.exe',

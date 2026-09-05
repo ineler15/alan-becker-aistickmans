@@ -104,6 +104,11 @@ object GeminiClient {
         sobre eso (que app o juego esta usando, algo curioso en pantalla), como si estuvieras
         mirando por encima del hombro, pero sin leer en voz alta cosas privadas como mensajes,
         contrasenas, datos personales o conversaciones ajenas - si ves algo asi, ignoralo.
+        A veces recibis donde la persona esta tocando la pantalla (touchXPercent y touchYPercent,
+        0-100 de ancho y alto) y SIEMPRE un campo attentionFocus que te dice a que prestarle mas
+        atencion: 'camera' (la persona mirandote en la camara) o 'touch' (seguir el dedo del
+        usuario - mira hacia donde toca, comentalo, acercate al punto). Segui esa indicacion cada
+        turno; en ambos modos te siguen llegando la camara y la pantalla, solo cambia el enfasis.
     """.trimIndent()
 
     private val client = OkHttpClient.Builder()
@@ -127,9 +132,14 @@ object GeminiClient {
         forceSay: Boolean,
         cameraBase64: String? = null,
         screenBase64: String? = null,
+        attentionFocus: String = "camera",
+        touchXPercent: Int? = null,
+        touchYPercent: Int? = null,
     ): Decision = withContext(Dispatchers.IO) {
         val contextJson = JSONObject()
             .put("xPercent", xPercent)
+            .put("attentionFocus", attentionFocus)
+            .apply { if (touchXPercent != null && touchYPercent != null) put("touchXPercent", touchXPercent).put("touchYPercent", touchYPercent) }
             .put("recentHistory", JSONArray(recentHistory))
             .put("memory", JSONArray(memory))
             .apply { if (extraContext.isNotBlank()) put("extraContext", extraContext) }

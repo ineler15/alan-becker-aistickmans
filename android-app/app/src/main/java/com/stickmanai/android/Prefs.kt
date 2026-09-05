@@ -61,6 +61,16 @@ object Prefs {
         sp(context).edit().putString("provider_$characterId", provider).apply()
     }
 
+    // Global attention preference shared by every character (mirrors PC's attentionFocus):
+    // 'camera' = pay more attention to the webcam frame, 'touch' = pay more attention to where
+    // the user is touching on the screen. Only changes emphasis, both signals still get sent.
+    fun attentionFocus(context: Context): String =
+        sp(context).getString("attention_focus", "camera") ?: "camera"
+
+    fun setAttentionFocus(context: Context, focus: String) {
+        sp(context).edit().putString("attention_focus", focus).apply()
+    }
+
     // Explicit "pareja" - a character id this one has a designated partner/love interest in,
     // stronger/more reliable than the emergent "crush" behavior in GeminiClient's system prompt -
     // a designated fact, not something that may or may not surface on its own. One-directional -

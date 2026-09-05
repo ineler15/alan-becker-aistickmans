@@ -24,8 +24,8 @@ class CharacterOverlay(
     private val context: Context,
     val def: CharacterDef,
     private val windowManager: WindowManager,
-    screenWidthPx: Int,
-    screenHeightPx: Int,
+    private val screenWidthPx: Int,
+    private val screenHeightPx: Int,
     private val onTap: (String) -> Unit,
 ) {
     companion object {
@@ -112,10 +112,12 @@ class CharacterOverlay(
                 downRawY = event.rawY
                 downAt = System.currentTimeMillis()
                 state.beingDragged = true
+                TouchTracker.record(event.rawX, event.rawY, screenWidthPx, screenHeightPx)
             }
             MotionEvent.ACTION_MOVE -> {
                 if (state.beingDragged) {
                     state.dragTo(event.rawX.toInt(), (event.rawY + PINCH_OFFSET_RATIO * sizePx).toInt())
+                    TouchTracker.record(event.rawX, event.rawY, screenWidthPx, screenHeightPx)
                 }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
