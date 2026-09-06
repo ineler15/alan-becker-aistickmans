@@ -5,6 +5,9 @@ const system = require('./system');
 const paint = require('./stickPaint');
 const notepad = require('./notepad');
 const shimeji = require('../jsEngine/jsShimejiController');
+const kitchen = require('../jsEngine/kitchen');
+const foodProp = require('../jsEngine/foodProp');
+const survival = require('../memory/survival');
 const pointerHighlight = require('../ui/pointerHighlight');
 
 // Off by default (see pcSettings.js) - moving the real OS mouse/clicking on the user's actual
@@ -121,6 +124,61 @@ async function execute(name, args, characterId) {
       return { ok: true, result: await system.runCommand(args.command) };
     case 'wait':
       return { ok: true, result: 'esperando' };
+    case 'fight': {
+      if (!config.survivalEnabled) return { ok: false, result: 'El sistema de vida/hambre/sed esta desactivado en Configuracion.' };
+      const attacker = shimeji.get(characterId);
+      if (!attacker) return { ok: false, result: 'No se encontro tu personaje.' };
+      const targetId = String(args.target || '').trim();
+      const target = shimeji.get(targetId);
+      if (!target) return { ok: false, result: `No hay ningun personaje llamado "${args.target || ''}".` };
+      const targetStats = survival.get(targetId);
+      if (targetStats.dead) return { ok: false, result: `${targetId} ya esta muerto - no tiene sentido seguir pegandole.` };
+      const dist = Math.abs(attacker.state.x - target.state.x);
+      if (dist > 100) {
+        return {
+          ok: false,
+          result: `Estas a ${Math.round(dist)}px de ${targetId} - muy lejos para pegarle. Acercate con walk_to (esta en x=${Math.round(target.state.x)}) y ataca de nuevo.`,
+        };
+      }
+      const dmg = Math.min(40, Math.max(5, Math.round(Number(args.strength) || 12)));
+      const after = survival.applyDamage(targetId, dmg);
+      target.state.say(`¡Auch! (${dmg} de daño)`);
+      target.state.setEmotion('trip');
+      target.state.setFace('angry', 'frown');
+      attacker.state.setEmotion('angry');
+      if (after.dead) target.state.kill();
+      return {
+        ok: true,
+        result: `Le pegaste a ${targetId} (${dmg} de daño) - le queda ${Math.round(after.hp)}/100 de vida.` + (after.dead ? ' ¡Lo mataste!' : ''),
+      };
+    }
+    case 'eat':
+    case 'drink': {
+      if (!config.survivalEnabled) return { ok: false, result: 'El sistema de vida/hambre/sed esta desactivado en Configuracion.' };
+      const me = shimeji.get(characterId);
+      if (!me) return { ok: false, result: 'No se encontro tu personaje.' };
+      const kitchenPos = kitchen.getPosition();
+      if (!kitchenPos) return { ok: false, result: 'Todavia no hay cocina en este lugar - no hay nada para comer/beber.' };
+      const dist = Math.abs(me.state.x - kitchenPos.x);
+      if (dist > 150) {
+        return {
+          ok: false,
+          result: `La cocina esta lejos (a ${Math.round(dist)}px). Anda hasta ahi con walk_to (x=${Math.round(kitchenPos.x)}) y cuando estes al lado pedi de nuevo ${name}.`,
+        };
+      }
+      const stats = survival.get(characterId);
+      const gain = 45;
+      const noun = name === 'eat' ? 'hambre' : 'sed';
+      const patch = name === 'eat' ? { hunger: stats.hunger + gain } : { thirst: stats.thirst + gain };
+      survival.set(characterId, patch);
+      me.state.say(name === 'eat' ? '¡Que rico!' : '¡Uf, qué sed tenía!');
+      me.state.setEmotion('happy');
+      // The visible performance: chew/drink gesture + food window shrink/tilt, kitchen station
+      // transition. Runs on its own timeline in foodProp.js; the stats above already landed.
+      if (name === 'eat') foodProp.playEat(characterId);
+      else foodProp.playDrink(characterId);
+      return { ok: true, result: `${name === 'eat' ? 'Comiste' : 'Tomaste agua'} y recuperaste ${noun} - ahora en ${Math.round(survival.get(characterId)[name === 'eat' ? 'hunger' : 'thirst'])}%.` };
+    }
     case 'set_animation':
       shimeji.sendCommand(characterId, 'set_animation', { state: args.state, caption: args.caption });
       return { ok: true, result: 'animacion actualizada' };

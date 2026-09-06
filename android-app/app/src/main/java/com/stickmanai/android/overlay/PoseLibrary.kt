@@ -240,6 +240,37 @@ object PoseLibrary {
         p.paths.leg2Shin to p.rest.leg2Shin + 40f,
     )
 
+    // Eat gesture: hand-to-mouth on arm1 with a quick little chew wobble, torso leaning slightly
+    // in - mirrors desktop's chewPose (period 5, chew = 6*sin). Deltas are rest-relative like
+    // every pose here (see sitPose's comment for why absolutes break on TCO/Orange).
+    private fun chewPose(p: RigProfile, frame: Int): Pose {
+        val period = 5f
+        val phase = TWO_PI * (frame % period.toInt()) / period
+        val chew = 6f * sin(phase)
+        return mapOf(
+            p.paths.torsoLower to p.rest.torsoLower - 6f + chew,
+            p.paths.arm1 to p.rest.arm1 - 55f + chew,
+            p.paths.arm2 to p.rest.arm2 + 30f,
+            p.paths.leg1 to p.rest.leg1 + 6f,
+            p.paths.leg2 to p.rest.leg2 + 6f,
+        )
+    }
+
+    // Drink gesture: torso leans back (tile head up to swallow) with a small gulp wobble - mirrors
+    // desktop's drinkPose (period 5, gulp = 4*sin, gulp*0.5 on the torso).
+    private fun drinkPose(p: RigProfile, frame: Int): Pose {
+        val period = 5f
+        val phase = TWO_PI * (frame % period.toInt()) / period
+        val gulp = 4f * sin(phase)
+        return mapOf(
+            p.paths.torsoLower to p.rest.torsoLower + 12f + gulp * 0.5f,
+            p.paths.arm1 to p.rest.arm1 - 60f,
+            p.paths.arm2 to p.rest.arm2 + 40f,
+            p.paths.leg1 to p.rest.leg1 + 8f,
+            p.paths.leg2 to p.rest.leg2 + 8f,
+        )
+    }
+
     /** Asleep: legs straightened together, arms relaxed, a slow "breathing" sway - the view itself gets rotated 90 to lie flat, see CharacterOverlay. */
     private fun sleepPose(p: RigProfile, frame: Int): Pose {
         val breathe = 4f * sin(TWO_PI * frame / 20f)
@@ -327,6 +358,8 @@ object PoseLibrary {
             is CharacterState.FrameKind.Climb -> climbPose(profile, kind.frame)
             is CharacterState.FrameKind.Sleep -> sleepPose(profile, kind.frame)
             is CharacterState.FrameKind.Tired -> tiredPose(profile)
+            is CharacterState.FrameKind.Chew -> chewPose(profile, kind.frame)
+            is CharacterState.FrameKind.Drink -> drinkPose(profile, kind.frame)
             is CharacterState.FrameKind.Custom -> customPose(profile.paths, profile.rest, kind.angles)
         }
     }

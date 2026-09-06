@@ -275,4 +275,69 @@ object Prefs {
     fun setPcAddress(context: Context, address: String) {
         sp(context).edit().putString("pc_address", address).apply()
     }
+
+    // ----- Survival system (vida/hambre/sed) -----
+    // Mirrors src/memory/survival.js on PC: per-character floats clamped to [0,100], hp hitting 0
+    // means dead (character lies still, AI loop skips it, a user chat message revives). Gated
+    // behind survivalEnabled - turning the feature off resets everyone to full stats.
+    data class SurvivalStats(var hp: Float, var hunger: Float, var thirst: Float, var dead: Boolean) {
+        companion object {
+            fun defaults() = SurvivalStats(100f, 100f, 100f, false)
+        }
+    }
+
+    fun survivalEnabled(context: Context): Boolean = sp(context).getBoolean("survival_enabled", true)
+
+    fun setSurvivalEnabled(context: Context, enabled: Boolean) {
+        sp(context).edit().putBoolean("survival_enabled", enabled).apply()
+    }
+
+    private fun statsFor(context: Context, characterId: String): SurvivalStats = SurvivalStats(
+        hp = sp(context).getFloat("stats_hp_$characterId", 100f).coerceIn(0f, 100f),
+        hunger = sp(context).getFloat("stats_hunger_$characterId", 100f).coerceIn(0f, 100f),
+        thirst = sp(context).getFloat("stats_thirst_$characterId", 100f).coerceIn(0f, 100f),
+        dead = sp(context).getBoolean("stats_dead_$characterId", false),
+    )
+
+    private fun persistStats(context: Context, characterId: String, s: SurvivalStats) {
+        sp(context).edit()
+            .putFloat("stats_hp_$characterId", s.hp.coerceIn(0f, 100f))
+            .putFloat("stats_hunger_$characterId", s.hunger.coerceIn(0f, 100f))
+            .putFloat("stats_thirst_$characterId", s.thirst.coerceIn(0f, 100f))
+            .putBoolean("stats_dead_$characterId", s.dead)
+            .apply()
+    }
+
+    /** Current survival stats, or null when the feature is off. */
+    fun survival(context: Context, characterId: String): SurvivalStats? =
+        if (survivalEnabled(context)) statsFor(context, characterId) else null
+
+    fun setSurvivalStat(context: Context, characterId: String, hp: Float = -1f, hunger: Float = -1f, thirst: Float = -1f, dead: Boolean? = null) {
+        val s = statsFor(context, characterId)
+        if (hp >= 0f) s.hp = hp.coerceIn(0f, 100f)
+        if (hunger >= 0f) s.hunger = hunger.coerceIn(0f, 100f)
+        if (thirst >= 0f) s.thirst = thirst.coerceIn(0f, 100f)
+        if (dead != null) s.dead = dead
+        persistStats(context, characterId, s)
+    }
+
+    /** Shared damage path for fight + starvation - kills in place when hp hits 0. */
+    fun applyDamage(context: Context, characterId: String, amount: Float): SurvivalStats {
+        val s = statsFor(context, characterId)
+        s.hp = (s.hp - amount).coerceAtLeast(0f)
+        s.dead = s.hp <= 0f
+        persistStats(context, characterId, s)
+        return s
+    }
+
+    /** Revive with full stats (user chat message, or the survival toggle reset). */
+    fun reviveCharacter(context: Context, characterId: String): SurvivalStats {
+        val s = SurvivalStats.defaults()
+        persistStats(context, characterId, s)
+        return s
+    }
+
+    fun resetAllSurvival(context: Context) {
+        for (c in allCharacters(context)) reviveCharacter(context, c.id)
+    }
 }

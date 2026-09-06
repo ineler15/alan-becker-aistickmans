@@ -16,6 +16,7 @@ import com.stickmanai.android.Prefs
 import com.stickmanai.android.allCharacters
 import com.stickmanai.android.R
 import com.stickmanai.android.ai.CameraCapture
+import com.stickmanai.android.ai.CharacterLore
 import com.stickmanai.android.ai.GeminiClient
 import com.stickmanai.android.ai.PcBridge
 import com.stickmanai.android.ai.PcPeersResult
@@ -60,6 +61,16 @@ class OverlayService : LifecycleService() {
         // Position/ghost sync with the PC runs faster than the AI decision loop - it's just
         // relaying reported state, not asking Gemini anything, so there's no cost to doing it often.
         const val PC_SYNC_INTERVAL_MS = 2000L
+        // Survival drain cadence - mirrors jsCharacterEngine.js: every poll hunger/thirst tick
+        // down, and once EITHER hits 0 the character loses hp too, eventually dying (state.kill()).
+        const val SURVIVAL_POLL_MS = 10_000L
+        const val HUNGER_PER_POLL = 0.5f
+        const val THIRST_PER_POLL = 0.75f
+        const val HP_LOSS_PER_POLL_STARVED = 1.5f
+        // Action-range checks mirror executor.js on PC.
+        const val FIGHT_DISTANCE_PX = 100
+        const val KITCHEN_DISTANCE_PX = 150
+        const val EAT_GAIN = 45
     }
 
     private lateinit var windowManager: android.view.WindowManager
@@ -68,6 +79,10 @@ class OverlayService : LifecycleService() {
     private val pcGhosts = HashMap<String, GhostOverlay>()
     private var pcPeersCache: PcPeersResult = PcPeersResult(0, emptyList())
     private val turnsSinceSay = HashMap<String, Int>()
+    // Lives only while the survival system is on and the kitchen rigs are present - see setupOverlays().
+    private var kitchenOverlay: KitchenOverlay? = null
+    // Cycles through FoodPropOverlay.FOOD_CANDIDATES so consecutive meals visibly switch foods.
+    private var foodCycle = 0
     // Anti-repetition: mirrors PC's agentLoop.js lastToolById/repeatStreakById - if the AI picks
     // the same tool 3 times in a row (e.g. stuck spamming set_animation or say), force a wait
     // instead so it doesn't look repetitive. walk_to is exempt since actually moving repeatedly
@@ -93,6 +108,7 @@ class OverlayService : LifecycleService() {
         startPhysicsLoop()
         startAiLoop()
         startPcSyncLoop()
+        startSurvivalLoop()
         return START_STICKY
     }
 
@@ -103,6 +119,8 @@ class OverlayService : LifecycleService() {
         overlays.clear()
         pcGhosts.values.forEach { it.detach() }
         pcGhosts.clear()
+        kitchenOverlay?.detach()
+        kitchenOverlay = null
         if (::chatButton.isInitialized) chatButton.detach()
         super.onDestroy()
     }
@@ -119,6 +137,11 @@ class OverlayService : LifecycleService() {
             ) { }
             overlay.attach()
             overlays[character.id] = overlay
+        }
+        // Kitchen prop exists only while the survival system is on (eat/drink need somewhere to
+        // happen); cycles its background stations as a visible "transition" whenever someone eats.
+        if (Prefs.survivalEnabled(this) && kitchenOverlay == null) {
+            kitchenOverlay = KitchenOverlay(this, windowManager, metrics.widthPixels).also { it.attach() }
         }
         if (!::chatButton.isInitialized) {
             chatButton = ChatButtonOverlay(this, windowManager)
@@ -173,6 +196,32 @@ class OverlayService : LifecycleService() {
         }
     }
 
+    /**
+     * Survival drain: slow real-time tick-down of hunger/thirst (then hp once either hits 0) for
+     * alive characters while the system is on - mirrors jsCharacterEngine.js, including using a
+     * wall-clock poll instead of per-physics-tick so the drain isn't affected by anything
+     * throttling (or pausing) the AI loop.
+     */
+    private fun startSurvivalLoop() {
+        serviceScope.launch {
+            while (true) {
+                delay(SURVIVAL_POLL_MS)
+                if (!Prefs.survivalEnabled(this@OverlayService)) continue
+                for ((characterId, overlay) in overlays) {
+                    if (overlay.state.dead) continue
+                    val s = Prefs.survival(this@OverlayService, characterId) ?: continue
+                    val hunger = (s.hunger - HUNGER_PER_POLL).coerceAtLeast(0f)
+                    val thirst = (s.thirst - THIRST_PER_POLL).coerceAtLeast(0f)
+                    val hp = (s.hp - if (hunger <= 0f || thirst <= 0f) HP_LOSS_PER_POLL_STARVED else 0f).coerceAtLeast(0f)
+                    Prefs.setSurvivalStat(this@OverlayService, characterId, hp = hp, hunger = hunger, thirst = thirst, dead = hp <= 0f)
+                    if (hp <= 0f) {
+                        mainHandler.post { overlay.state.kill() }
+                    }
+                }
+            }
+        }
+    }
+
     private fun syncGhosts() {
         val metrics = resources.displayMetrics
         val floorY = metrics.heightPixels - (48 * metrics.density).toInt()
@@ -198,12 +247,30 @@ class OverlayService : LifecycleService() {
         val characterId = overlay.def.id
         val apiKey = Prefs.apiKeyFor(this, characterId)
         if (apiKey.isBlank()) return
+        val metrics = resources.displayMetrics
+        // Dead (survival system, hp 0): the character lies still and the AI loop skips its turns
+        // so it can't decide anything or wander. The only way back is a chat message from the
+        // user - it revives AND lets the character answer the message this same round (falls
+        // through to the decide below). Mirrors PC's agentLoop.js dead-gate.
+        if (Prefs.survivalEnabled(this)) {
+            val st = Prefs.survival(this, characterId)!!
+            if (st.dead || overlay.state.dead) {
+                val reviveMsg = PendingMessages.consume(characterId)
+                if (reviveMsg != null) {
+                    Prefs.reviveCharacter(this, characterId)
+                    overlay.state.revive()
+                    overlay.state.wakeUp()
+                    overlay.addHistory("revivido: el usuario te revivio con un mensaje")
+                } else {
+                    return
+                }
+            }
+        }
         // Skip the AI call entirely while asleep - saves quota, and a sleeping character
         // shouldn't be deciding to do anything anyway. It wakes up on its own after
         // CharacterState.SLEEP_DURATION_MS or if the user drags/pinches it; any message that
         // arrives meanwhile is left in PendingMessages for the next successful (awake) turn.
         if (overlay.state.sleeping) return
-        val metrics = resources.displayMetrics
         val userMessage = PendingMessages.consume(characterId)
         val silentStreak = turnsSinceSay[characterId] ?: 0
 
@@ -244,16 +311,24 @@ class OverlayService : LifecycleService() {
         // Extra context SEPARATE from the automatic one - user-written + character self-written
         val userCtx = Prefs.userContext(this, characterId)
         val selfCtx = Prefs.selfContext(this, characterId)
+        val survivalNote = if (Prefs.survivalEnabled(this)) survivalContextNote(characterId, metrics) else null
         val extraContext = listOf(
             if (userCtx.isNotBlank()) "Contexto que te escribio el usuario (se configura en la app, va fijo): $userCtx" else null,
             if (selfCtx.isNotBlank()) "Contexto extra que vos mismo te escribiste con set_context: $selfCtx" else null,
+            survivalNote,
         ).filterNotNull().joinToString("\n\n")
 
         try {
             val decision = GeminiClient.decide(
                 apiKey = apiKey,
                 provider = Prefs.providerFor(this, characterId),
-                personality = genderLine + partnerLine + Prefs.personality(this, characterId),
+                personality =
+                    // Canon lore (CharacterLore.kt) first - a fixed "who you are" layer below any
+                    // persona the character defines for itself, so fresh characters still know their
+                    // Alan Becker origin without needing define_personality. Same prepend trick as
+                    // genderLine: GeminiClient embeds personality verbatim in the prompt.
+                    (CharacterLore.loreFor(characterId).takeIf { it.isNotBlank() }?.let { "$it\n\n" } ?: "") +
+                    genderLine + partnerLine + Prefs.personality(this, characterId),
                 recentHistory = overlay.recentHistory.toList(),
                 memory = Prefs.memory(this, characterId),
                 extraContext = extraContext,
@@ -293,6 +368,27 @@ class OverlayService : LifecycleService() {
             // decisions should move the character now - on error it just stays put.
             overlay.addHistory("error: ${e.message}")
         }
+    }
+
+    // Survival system context: the character's own life/hunger/thirst, where the kitchen is, and
+    // the rules for eating/drinking/fighting - mirrors agentLoop.js's survivalNote on PC. Fed via
+    // extraContext so it reaches every provider without GeminiClient needing to know about it.
+    private fun survivalContextNote(characterId: String, metrics: android.util.DisplayMetrics): String {
+        val s = Prefs.survival(this, characterId) ?: return ""
+        val kp = kitchenOverlay?.getPosition()
+        val kitchenPart = if (kp != null) {
+            val pctX = (kp.first * 100 / metrics.widthPixels.toFloat()).toInt()
+            "que esta en la cocina al ${pctX}% del ancho de la pantalla"
+        } else {
+            "pero todavia no hay cocina en este lugar"
+        }
+        return "SISTEMA DE VIDA/HAMBRE/SED: tu vida es ${Math.round(s.hp)}/100, tu hambre ${Math.round(s.hunger)}/100 " +
+            "y tu sed ${Math.round(s.thirst)}/100. Si el hambre o la sed llegan a 0 perdes vida poco a poco " +
+            "hasta morir. Para comer (eat) o beber (drink) tenes que ESTAR EN $kitchenPart - si estas lejos, " +
+            "camina hasta ahi con walk_to y recien ahi usa eat/drink. Con fight podes pegarle a otro " +
+            "stickman que este cerca tuyo (en tu contexto ves la posicion de tus peers) y bajarle su " +
+            "vida hasta que muera (luego el usuario lo revive). Si vos estas muerto, no podes hacer " +
+            "nada hasta que el usuario te reviva."
     }
 
     /**
@@ -376,8 +472,161 @@ class OverlayService : LifecycleService() {
                 // Silently does nothing if not activated in MainActivity - same "no insistas"
                 // pattern as the schema description tells the model.
             }
+            "fight" -> {
+                // Only local-to-local characters can fight - a PC ghost isn't something you can
+                // punch on this screen. Failure reasons go into history so the AI learns from them.
+                if (!Prefs.survivalEnabled(this)) {
+                    overlay.addHistory("fight bloqueado: el sistema de vida/hambre/sed esta desactivado")
+                    return@applyDecision
+                }
+                val targetId = args.optString("target", "").trim()
+                val targetOverlay = overlays[targetId]
+                if (targetOverlay == null) {
+                    overlay.addHistory("fight bloqueado: no hay ningun personaje llamado \"$targetId\"")
+                    return@applyDecision
+                }
+                val targetStats = Prefs.survival(this, targetId) ?: return@applyDecision
+                if (targetStats.dead || targetOverlay.state.dead) {
+                    overlay.addHistory("fight bloqueado: $targetId ya esta muerto - no tiene sentido seguir pegandole")
+                    return@applyDecision
+                }
+                val dist = Math.abs(overlay.state.x - targetOverlay.state.x)
+                if (dist > FIGHT_DISTANCE_PX) {
+                    overlay.addHistory("fight bloqueado: estas a $dist px de $targetId - muy lejos para pegarle. Acercate con walk_to primero")
+                    return@applyDecision
+                }
+                val dmg = Math.min(40, Math.max(5, Math.round(args.optDouble("strength", 12.0)).toInt()))
+                val after = Prefs.applyDamage(this, targetId, dmg.toFloat())
+                targetOverlay.say("¡Auch! ($dmg de daño)")
+                targetOverlay.state.setEmotion("trip")
+                targetOverlay.state.setFace("angry", "frown")
+                overlay.state.setEmotion("angry")
+                if (after.dead) targetOverlay.state.kill()
+                overlay.addHistory("fight: le pegaste a $targetId ($dmg de daño) - le queda ${Math.round(after.hp)}/100 de vida" + if (after.dead) " - lo mataste" else "")
+            }
+            "eat", "drink" -> {
+                if (!Prefs.survivalEnabled(this)) {
+                    overlay.addHistory("$tool bloqueado: el sistema de vida/hambre/sed esta desactivado")
+                    return@applyDecision
+                }
+                val kitchenPos = kitchenOverlay?.getPosition()
+                if (kitchenPos == null) {
+                    overlay.addHistory("$tool bloqueado: todavia no hay cocina en este lugar - no hay nada para comer/beber")
+                    return@applyDecision
+                }
+                val dist = Math.abs(overlay.state.x - kitchenPos.first)
+                if (dist > KITCHEN_DISTANCE_PX) {
+                    overlay.addHistory("$tool bloqueado: la cocina esta lejos ($dist px). Anda hasta ahi con walk_to y pedi de nuevo")
+                    return@applyDecision
+                }
+                val stats = Prefs.survival(this, overlay.def.id) ?: return@applyDecision
+                val eating = tool == "eat"
+                if (eating) Prefs.setSurvivalStat(this, overlay.def.id, hunger = stats.hunger + EAT_GAIN)
+                else Prefs.setSurvivalStat(this, overlay.def.id, thirst = stats.thirst + EAT_GAIN)
+                overlay.say(if (eating) "¡Que rico!" else "¡Uf, qué sed tenía!")
+                overlay.state.setEmotion("happy")
+                // Visible performance: chew/drink gesture + food window shrank/tilted, kitchen
+                // station transition - runs its own timeline; the stat gain already landed.
+                if (eating) playEat(overlay) else playDrink(overlay)
+            }
             "wait" -> { /* no-op */ }
         }
+    }
+
+    // --- Food/drink visible props (mirror of PC's src/jsEngine/foodProp.js) ---------------------
+    // Which rigs actually exist under assets/rigs on this device - the pizza and cup come from
+    // there, so playEat/playDrink degrade silently to just the gesture if the files are missing.
+    private val density: Float get() = resources.displayMetrics.density
+
+    private fun foodsAvailable(): List<String> =
+        FoodPropOverlay.FOOD_CANDIDATES.filter { RigFigure.forCharacterOrNull(this, it) != null }
+
+    private fun nextFoodId(): String? {
+        val list = foodsAvailable()
+        if (list.isEmpty()) return null
+        val id = list[foodCycle % list.size]
+        foodCycle++
+        return id
+    }
+
+    // Top of the character's head where the mouth is, in screen px - food slides toward this and
+    // gets bitten from here. Character windows are anchored by their bottom-center (state.x/y).
+    private fun foodMouthPos(overlay: CharacterOverlay): Pair<Int, Int> {
+        val sizePx = overlay.sizePx
+        val bx = overlay.state.x - sizePx / 2
+        val by = overlay.state.y - sizePx
+        val bias = if (overlay.state.lookRight) 0.6f else 0.4f
+        return Pair((bx + sizePx * bias).toInt(), (by + sizePx * 0.18f).toInt())
+    }
+
+    // Slide a food overlay from one screen point to another, eased so it accelerates out of the
+    // kitchen and settles at the mouth. Runs on the main handler (applyDecision already is).
+    private fun slide(food: FoodPropOverlay, from: Pair<Int, Int>, to: Pair<Int, Int>, steps: Int, stepMs: Long) {
+        for (i in 1..steps) {
+            val t = i.toFloat() / steps
+            val eased = t * t
+            mainHandler.postDelayed({
+                food.moveTo(
+                    (from.first + (to.first - from.first) * eased).toInt(),
+                    (from.second + (to.second - from.second) * eased).toInt()
+                )
+            }, stepMs * i)
+        }
+    }
+
+    private fun playEat(overlay: CharacterOverlay) {
+        val foodId = nextFoodId() ?: return
+        // The act of eating is also the kitchen's "background transitions" moment on PC.
+        kitchenOverlay?.nextStation()
+        val food = FoodPropOverlay(this, windowManager)
+        if (!food.showFood(foodId)) { food.detach(); return }
+        overlay.state.startEat()
+        val mouth = foodMouthPos(overlay)
+        val dest = Pair(mouth.first - food.sizePx / 2, mouth.second - food.sizePx / 2)
+        val kitchenCenter = kitchenOverlay?.getPosition()
+        val from = kitchenCenter
+            ?.let { Pair(it.first - food.sizePx / 2, dest.second + (12 * density).toInt()) }
+            ?: Pair(dest.first, dest.second - (40 * density).toInt())
+        slide(food, from, dest, FoodPropOverlay.SLIDE_STEPS, 50L)
+        // One bite per BITE_MS, shrinking the food (wedge from the top) and jiggling it; the
+        // chew gesture is already being driven by CharacterState. The final bite tick leaves
+        // bites at 0, after which the whole food window slides back out (simulating the kitchen
+        // counter) and detaches.
+        for (i in 1 until FoodPropOverlay.EAT_BITES) {
+            mainHandler.postDelayed({
+                food.updateBites(FoodPropOverlay.EAT_BITES - i, (kotlin.random.Random.nextFloat() - 0.5f) * 0.14f)
+            }, i * FoodPropOverlay.BITE_MS)
+        }
+        mainHandler.postDelayed({
+            slide(food, dest, Pair(from.first, dest.second), FoodPropOverlay.SLIDE_STEPS, 45L)
+            food.detach()
+        }, FoodPropOverlay.EAT_DURATION_MS - FoodPropOverlay.SLIDE_STEPS * 45)
+    }
+
+    private fun playDrink(overlay: CharacterOverlay) {
+        kitchenOverlay?.nextStation()
+        val food = FoodPropOverlay(this, windowManager)
+        if (!food.showDrink()) { food.detach(); return }
+        overlay.state.startDrink()
+        val mouth = foodMouthPos(overlay)
+        val dest = Pair(mouth.first - food.sizePx / 2, mouth.second - food.sizePx / 2)
+        val kitchenCenter = kitchenOverlay?.getPosition()
+        val from = kitchenCenter
+            ?.let { Pair(it.first - food.sizePx / 2, dest.second + (12 * density).toInt()) }
+            ?: Pair(dest.first, dest.second - (40 * density).toInt())
+        slide(food, from, dest, FoodPropOverlay.SLIDE_STEPS, 50L)
+        // A few gulps: tilt the cup down then back up, timed into the drink gesture.
+        val gulps = 3
+        for (i in 0 until gulps) {
+            mainHandler.postDelayed({
+                food.updateDrinkTilt(16f)
+                mainHandler.postDelayed({ food.updateDrinkTilt(0f) }, FoodPropOverlay.DRINK_GULP_MS / 2)
+            }, i * FoodPropOverlay.DRINK_GULP_MS + 300)
+        }
+        mainHandler.postDelayed({
+            slide(food, dest, Pair(from.first, dest.second), FoodPropOverlay.SLIDE_STEPS, 45L)
+            food.detach()
+        }, FoodPropOverlay.DRINK_DURATION_MS - FoodPropOverlay.SLIDE_STEPS * 45)
     }
 
     private fun openUrl(url: String) {

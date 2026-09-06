@@ -163,6 +163,7 @@ async function init() {
 
   document.getElementById('sharedKey').value = collapseRepeatedKey(settings.sharedApiKey || '');
   document.getElementById('allowMouseControl').checked = !!settings.allowMouseControl;
+  document.getElementById('survivalEnabled').checked = settings.survivalEnabled !== false;
   document.getElementById('attentionFocus').value = settings.attentionFocus === 'mouse' ? 'mouse' : 'camera';
 
   document.getElementById('contextSaveBtn').addEventListener('click', () => {
@@ -211,6 +212,7 @@ async function init() {
       perCharacterContext: perCharacterContextOut,
       enabledIds: enabled,
       allowMouseControl: document.getElementById('allowMouseControl').checked,
+      survivalEnabled: document.getElementById('survivalEnabled').checked,
       attentionFocus: document.getElementById('attentionFocus').value,
     });
   });

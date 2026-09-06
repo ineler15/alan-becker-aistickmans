@@ -32,6 +32,12 @@ function sendCommand(characterId, tool, args = {}) {
     case 'set_animation':
       state.setEmotion(args.state);
       break;
+    case 'eat':
+      state.startEat();
+      break;
+    case 'drink':
+      state.startDrink();
+      break;
     case 'set_emotion':
       state.setFace(args.eyes, args.mouth);
       break;

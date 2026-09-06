@@ -128,6 +128,43 @@ object ActionsSchema {
         put(tool("wait", "No haces nada este turno. Reservalo para turnos excepcionales.", withFaceParams(JSONObject())))
         put(
             tool(
+                "fight",
+                "Pelea contra otro stickman que este cerca tuyo (a menos de ~100px). Le pegas un golpe " +
+                    "directo que le baja la vida (hp), y si le llegas a bajar toda la vida se muere y hay " +
+                    "que revivirlo desde el chat. Solo funciona con el sistema de vida activado y solo si " +
+                    "estas al lado del otro - si tu objetivo esta lejos, primero acercate con walk_to (en " +
+                    "tu contexto ves la posicion de tus peers). No la uses para atacar por atacar: pelea " +
+                    "solo si tiene sentido para tu personaje.",
+                withFaceParams(
+                    JSONObject()
+                        .put("target", prop("string", "id de otro personaje, ej: Red, Blue, TCO, victim, Orange"))
+                        .put("strength", prop("number", "opcional, 5-40, default 12"))
+                ),
+                listOf("target")
+            )
+        )
+        put(
+            tool(
+                "eat",
+                "Come algo en la cocina y recupera hambre (~45%). SOLO funciona estando cerca de la " +
+                    "cocina (a menos de ~150px) - si estas lejos, primero camina hasta ella con walk_to " +
+                    "(su posicion viene en tu contexto). Un personaje con el hambre en 0 empieza a perder " +
+                    "vida, asi que es importante volver a la cocina de vez en cuando. Requiere el sistema " +
+                    "de vida activado.",
+                withFaceParams(JSONObject())
+            )
+        )
+        put(
+            tool(
+                "drink",
+                "Toma agua en la cocina y recupera sed (~45%). Igual que eat: SOLO funciona estando " +
+                    "cerca de la cocina - si estas lejos, camina con walk_to primero. La sed vacia tambien " +
+                    "hace perder vida, asi que no la descuides. Requiere el sistema de vida activado.",
+                withFaceParams(JSONObject())
+            )
+        )
+        put(
+            tool(
                 "open_app",
                 "Abre una pagina web en el navegador del celular. Para buscar algo en Google, " +
                     "arma vos mismo la URL: https://www.google.com/search?q=tu+busqueda+aqui",

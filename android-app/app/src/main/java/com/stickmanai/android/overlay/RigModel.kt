@@ -28,6 +28,20 @@ data class RigNode(
     // instead of an octagon when the whole run is drawn as one smoothed stroke (see RigView).
     // 0 for a straight segment (true for every bone in Red's rig).
     val curveRadius: Float,
+    // Polygon nodes (Ellipse/Triangle/Trapezoid), added for the kitchen/food props - the kitchen
+    // rigs in the pack build their tops/backs out of Trapezoid and Triangle nodes, and the pizza
+    // uses Ellipse "pepperoni" discs. Null/false when the JSON has no such field. See
+    // gen_prop_rigs.mjs's convertNode() for the exact short field names coming out of the WASM
+    // parser (mirrors sticknodes-rs's TriangleType + trapezoid fields).
+    val triangleType: String?,
+    val triangleFlipped: Boolean,
+    val triangleUpsideDown: Boolean,
+    val trapezoidThicknessStart: Float,
+    val trapezoidThicknessEnd: Float,
+    val useTrapezoidThicknessStart: Boolean,
+    val useTrapezoidThicknessEnd: Boolean,
+    val trapezoidRoundedStart: Boolean,
+    val trapezoidRoundedEnd: Boolean,
     val children: List<RigNode>,
 )
 
@@ -81,6 +95,15 @@ class RigFigure(val bodyColor: Int, val root: RigNode) {
                 outline = outline,
                 outlineColor = if (outline) colorFrom(o.getJSONArray("oc")) else null,
                 curveRadius = o.optDouble("cr", 0.0).toFloat(),
+                triangleType = o.optString("tri").takeIf { it.isNotBlank() },
+                triangleFlipped = o.optBoolean("triF", false),
+                triangleUpsideDown = o.optBoolean("triU", false),
+                trapezoidThicknessStart = o.optDouble("thS", 0.0).toFloat(),
+                trapezoidThicknessEnd = o.optDouble("thE", 0.0).toFloat(),
+                useTrapezoidThicknessStart = o.optBoolean("uS", false),
+                useTrapezoidThicknessEnd = o.optBoolean("uE", false),
+                trapezoidRoundedStart = o.optBoolean("rdS", false),
+                trapezoidRoundedEnd = o.optBoolean("rdE", false),
                 children = children,
             )
         }

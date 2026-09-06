@@ -26,6 +26,15 @@ let currentMouthStyle = 'neutral';
 const rigWidth = Number(params.get('rw')) || window.innerWidth;
 const rigHeight = Number(params.get('rh')) || window.innerHeight;
 
+// Food/kitchen-prop extras. foodBites puts this window in "food" mode: the rig (e.g. pizza.json) is
+// drawn clipped to a shrinking wedge so each bite visibly removes a piece, plus a per-bite jiggle.
+// drink mode rotates the whole rig (a cup) by the tilt angle, synced with swallow timings.
+const foodBitesTotal = Number(params.get('foodBites')) || 0;
+const drinkMode = params.get('drink') === '1';
+let foodBitesLeft = foodBitesTotal;
+let foodJiggleRad = 0;
+let drinkTiltDeg = 0;
+
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 const speechEl = document.getElementById('speech');
@@ -34,6 +43,10 @@ const CIRCLE_RADIUS_FACTOR = 0.65;
 let figure = null;
 let currentPose = new Map();
 let lookRight = true;
+// Survival stats + death state, sent along with each pose when the life system is on - drawn as
+// three mini bars over the canvas (vida roja, hambre naranja, sed azul) and a red X when dead.
+let lastStats = null;
+let dead = false;
 
 function layout(node, parentAngleDeg, parentEnd, path, acc) {
   const isRoot = node.t === 'RootNode';
@@ -57,6 +70,54 @@ function circleCenter(bone, radius) {
   return { x: bone.start.x + (dx / dist) * radius, y: bone.start.y + (dy / dist) * radius };
 }
 
+// Unit vector perpendicular to a rig-space segment (used for polygon base/width extents).
+function perpDir(dx, dy) {
+  const dist = Math.hypot(dx, dy) || 1e-3;
+  return { x: -dy / dist, y: dx / dist };
+}
+
+// Polygons (Triangle/Ellipse/Trapezoid, added for the kitchen/food props) corner helpers.
+// Trapezoid start half-width uses trapezoid_thickness_start when use_trapezoid_thickness_start,
+// else the node's plain thickness - same for the end. Ellipse draws centered on the segment with
+// rx = length/2 along the bone and ry = thickness/2 across, matching Stick Nodes' proportions.
+function trapezoidHalfStart(node) {
+  return (node.uS && node.thS > 0 ? node.thS : node.th) / 2;
+}
+function trapezoidHalfEnd(node) {
+  return (node.uE && node.thE > 0 ? node.thE : node.th) / 2;
+}
+function triangleCorners(bone, node) {
+  const p = perpDir(bone.end.x - bone.start.x, bone.end.y - bone.start.y);
+  const h = (node.th || 1) / 2;
+  if (node.triU) {
+    return [
+      { x: bone.start.x - p.x * h, y: bone.start.y - p.y * h },
+      { x: bone.start.x + p.x * h, y: bone.start.y + p.y * h },
+      bone.end,
+    ];
+  }
+  if (node.tri === 'RightTriangle') {
+    const s = node.triF ? -1 : 1;
+    return [bone.start, { x: bone.start.x + p.x * h * s, y: bone.start.y + p.y * h * s }, bone.end];
+  }
+  return [
+    { x: bone.start.x - p.x * h, y: bone.start.y - p.y * h },
+    { x: bone.start.x + p.x * h, y: bone.start.y + p.y * h },
+    bone.end,
+  ];
+}
+function trapezoidCorners(bone, node) {
+  const p = perpDir(bone.end.x - bone.start.x, bone.end.y - bone.start.y);
+  const hs = trapezoidHalfStart(node);
+  const he = trapezoidHalfEnd(node);
+  return [
+    { x: bone.start.x + p.x * hs, y: bone.start.y + p.y * hs },
+    { x: bone.start.x - p.x * hs, y: bone.start.y - p.y * hs },
+    { x: bone.end.x - p.x * he, y: bone.end.y - p.y * he },
+    { x: bone.end.x + p.x * he, y: bone.end.y + p.y * he },
+  ];
+}
+
 function bounds(bones) {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   const inc = (x, y) => {
@@ -71,6 +132,16 @@ function bounds(bones) {
       const c = circleCenter(bone, r);
       inc(c.x - r, c.y - r);
       inc(c.x + r, c.y + r);
+    } else if (bone.node.t === 'Ellipse') {
+      const rx = Math.max(1, bone.node.l / 2);
+      const ry = Math.max(1, bone.node.th / 2);
+      const c = { x: (bone.start.x + bone.end.x) / 2, y: (bone.start.y + bone.end.y) / 2 };
+      inc(c.x - rx, c.y - ry);
+      inc(c.x + rx, c.y + ry);
+    } else if (bone.node.t === 'Triangle') {
+      for (const corner of triangleCorners(bone, bone.node)) inc(corner.x, corner.y);
+    } else if (bone.node.t === 'Trapezoid') {
+      for (const corner of trapezoidCorners(bone, bone.node)) inc(corner.x, corner.y);
     } else {
       inc(bone.start.x, bone.start.y);
       inc(bone.end.x, bone.end.y);
@@ -103,7 +174,7 @@ function maxBounds() {
     const maxY = Math.max(a.y + a.h, b.y + b.h);
     return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
   };
-  const kinds = ['stand', 'sit', 'walk', 'run', 'bounce', 'trip', 'fall', 'pinch', 'angry', 'sleep', 'tired'];
+  const kinds = ['stand', 'sit', 'walk', 'run', 'bounce', 'trip', 'fall', 'pinch', 'angry', 'sleep', 'tired', 'chew', 'drink'];
   // Several poses swing with `frame` on a sine wave (walk/run/bounce/trip/pinch/angry/sleep,
   // periods up to 20) - frame 0 alone would miss their peak amplitude entirely (sin(0) = 0).
   // Sampling a full 20-frame span covers every period's peak regardless of which kind it is.
@@ -135,6 +206,34 @@ function draw() {
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+  // Food mode: clip the whole rig draw to a shrinking wedge (each bite removes a slice) and jiggle
+  // the rig slightly per bite; drink mode rotates the cup to match the swallow timing. Both applied
+  // around the current rig's center so the rotation/clip stay anchored regardless of pose.
+  let boundsCenter = null;
+  if (foodBitesTotal > 0 || (drinkMode && drinkTiltDeg)) {
+    boundsCenter = tx({ x: rb.x + rb.w / 2, y: rb.y + rb.h / 2 });
+    ctx.save();
+    if (foodJiggleRad) {
+      ctx.translate(boundsCenter.x, boundsCenter.y);
+      ctx.rotate(foodJiggleRad);
+      ctx.translate(-boundsCenter.x, -boundsCenter.y);
+    }
+    if (drinkMode && drinkTiltDeg) {
+      ctx.translate(boundsCenter.x, boundsCenter.y);
+      ctx.rotate((drinkTiltDeg * Math.PI) / 180);
+      ctx.translate(-boundsCenter.x, -boundsCenter.y);
+    }
+    if (foodBitesTotal > 0) {
+      const radius = (Math.max(rb.w, rb.h) / 2) * scale + 4;
+      const remaining = Math.min(1, Math.max(0, foodBitesLeft / foodBitesTotal));
+      ctx.beginPath();
+      ctx.moveTo(boundsCenter.x, boundsCenter.y);
+      ctx.arc(boundsCenter.x, boundsCenter.y, radius, -Math.PI / 2, -Math.PI / 2 + remaining * Math.PI * 2, false);
+      ctx.closePath();
+      ctx.clip();
+    }
+  }
+
   // The head is always the deepest/last-drawn thing in the tree in both rig templates (see
   // customCharacters.js) - a plain Circle/FilledCircle node for the "normal" model, or the final
   // curveRadius ring chain for the "hollow" one. Capturing whichever is drawn LAST instead of
@@ -165,6 +264,62 @@ function draw() {
         ctx.stroke();
       }
       headAnchor = { x: center.x, y: center.y, r };
+      continue;
+    }
+
+    // Polygon nodes (kitchen/food props): Ellipse fills an ellipse centered on the segment,
+    // Triangle/Trapezoid fill their corner polygon. Honoring the hollow/outline fields like the
+    // circle branch does so these stay consistent with how Stick Nodes draws non-stroke nodes.
+    if (node.t === 'Ellipse') {
+      const rx = Math.max(1, (node.l / 2) * scale);
+      const ry = Math.max(1, (node.th / 2) * scale);
+      const center = tx({ x: (bone.start.x + bone.end.x) / 2, y: (bone.start.y + bone.end.y) / 2 });
+      const rad = (Math.atan2(-(bone.end.y - bone.start.y), bone.end.x - bone.start.x) * 180) / Math.PI;
+      ctx.beginPath();
+      ctx.ellipse(center.x, center.y, rx, ry, (-rad * Math.PI) / 180, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      if (node.outline) {
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = node.oc ? colorCss(node.oc) : '#000';
+        ctx.stroke();
+      }
+      continue;
+    }
+    if (node.t === 'Triangle' || node.t === 'Trapezoid') {
+      const corners = node.t === 'Triangle' ? triangleCorners(bone, node) : trapezoidCorners(bone, node);
+      ctx.beginPath();
+      const first = tx(corners[0]);
+      ctx.moveTo(first.x, first.y);
+      for (let k = 1; k < corners.length; k++) {
+        const c = tx(corners[k]);
+        ctx.lineTo(c.x, c.y);
+      }
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+      if (node.outline) {
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = node.oc ? colorCss(node.oc) : '#000';
+        ctx.stroke();
+      }
+      // Rounded trapezoid ends (rdS/rdE) - cap them with a filled disc of that end's width.
+      if (node.t === 'Trapezoid') {
+        if (node.rdS) {
+          const s = tx(bone.start);
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, trapezoidHalfStart(node) * scale, 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.fill();
+        }
+        if (node.rdE) {
+          const e = tx(bone.end);
+          ctx.beginPath();
+          ctx.arc(e.x, e.y, trapezoidHalfEnd(node) * scale, 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.fill();
+        }
+      }
       continue;
     }
 
@@ -212,9 +367,55 @@ function draw() {
     ctx.stroke();
   }
 
+  if (boundsCenter) ctx.restore();
+
   if (headAnchor) {
     if (hasFace) window.FaceRenderer.drawFace(ctx, headAnchor.x, headAnchor.y, headAnchor.r, currentEyeStyle, currentMouthStyle);
     window.FaceRenderer.drawAccessory(ctx, headAnchor.x, headAnchor.y, headAnchor.r, accessory);
+  }
+
+  // Dead: a bold red X over the middle of the character reads as "muerto/eliminado" from a
+  // glance, on top of the lying-down pose it's already in.
+  if (dead) {
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const r = Math.min(canvas.width, canvas.height) * 0.35;
+    ctx.strokeStyle = 'rgba(255, 40, 40, 0.95)';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx - r, cy - r);
+    ctx.lineTo(cx + r, cy + r);
+    ctx.moveTo(cx + r, cy - r);
+    ctx.lineTo(cx - r, cy + r);
+    ctx.stroke();
+  }
+
+  // Survival bars hogged along the top edge (the canvas is character-stripped and pinned to the
+  // window's bottom, so the top row is its own clean strip): vida, hambre, sed.
+  if (lastStats) {
+    const bars = [
+      { label: 'vida', value: lastStats.hp, color: '#e53935' },
+      { label: 'hambre', value: lastStats.hunger, color: '#fb8c00' },
+      { label: 'sed', value: lastStats.thirst, color: '#1e88e5' },
+    ];
+    const barW = 20;
+    const barH = 4;
+    const gap = 3;
+    const totalW = bars.length * barW + (bars.length - 1) * gap;
+    let bx = canvas.width / 2 - totalW / 2;
+    const by = 4;
+    ctx.textAlign = 'center';
+    for (const bar of bars) {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+      ctx.fillRect(bx, by, barW, barH);
+      ctx.fillStyle = bar.color;
+      ctx.fillRect(bx, by, Math.max(barH, (Math.min(100, Math.max(0, bar.value)) / 100) * barW), barH);
+      ctx.fillStyle = '#fff';
+      ctx.font = '7px system-ui, sans-serif';
+      ctx.fillText(bar.label, bx + barW / 2, by + barH + 7);
+      bx += barW + gap;
+    }
   }
 }
 
@@ -224,6 +425,8 @@ ipcRenderer.on('character:pose', (_event, payload) => {
   if (payload.eyeStyle) currentEyeStyle = payload.eyeStyle;
   if (payload.mouthStyle) currentMouthStyle = payload.mouthStyle;
   if (payload.lookRight !== undefined) lookRight = payload.lookRight;
+  lastStats = payload.stats || null;
+  if (payload.dead !== undefined) dead = payload.dead;
   canvas.style.transform = lookRight ? 'scaleX(-1)' : 'none';
   if (payload.speechText) {
     speechEl.textContent = payload.speechText;
@@ -240,6 +443,36 @@ function resizeCanvas() {
   maxBoundsCache = null;
   draw();
 }
+
+// Food/window-role updates for prop windows (pizza bites + jiggle, drink tilt).
+ipcRenderer.on('character:food', (_event, payload) => {
+  if (payload.id !== characterId) return;
+  if (payload.bites !== undefined) foodBitesLeft = payload.bites;
+  if (payload.jiggle !== undefined) foodJiggleRad = payload.jiggle;
+  if (payload.drinkTilt !== undefined) drinkTiltDeg = payload.drinkTilt;
+  draw();
+});
+
+// Swap this window's rig at runtime - used by the kitchen's station cycling (kitchen.js) so the
+// kitchen prop can transition between its different background rigs with a quick fade.
+ipcRenderer.on('character:rig', async (_event, payload) => {
+  if (payload.id !== characterId) return;
+  canvas.style.transition = 'opacity 200ms';
+  canvas.style.opacity = '0';
+  await new Promise((r) => setTimeout(r, 210));
+  try {
+    const res = await fetch(payload.url);
+    figure = await res.json();
+  } catch {
+    canvas.style.opacity = '1';
+    return;
+  }
+  resizeCanvas();
+  canvas.style.opacity = '1';
+  setTimeout(() => {
+    canvas.style.transition = 'none';
+  }, 250);
+});
 
 window.addEventListener('resize', resizeCanvas);
 

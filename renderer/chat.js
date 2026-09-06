@@ -2,6 +2,7 @@ const select = document.getElementById('target');
 const textarea = document.getElementById('message');
 const button = document.getElementById('send');
 const giveSnackButton = document.getElementById('giveSnack');
+const reviveButton = document.getElementById('reviveBtn');
 
 async function init() {
   const { characters, defaultCharacterId } = await window.stickmanAPI.getCharacters();
@@ -46,6 +47,14 @@ textarea.addEventListener('keydown', (event) => {
 giveSnackButton.addEventListener('click', () => {
   if (!select.value) return;
   window.stickmanAPI.sendChatMessage(select.value, '🍪 Te acaban de regalar un alfajor. ¡Disfrutalo!');
+  window.close();
+});
+
+// Sending any chat message to a dead character already revives it (see agentLoop.js) - this is
+// just a one-click way to do exactly that with an unambiguous message, without typing anything.
+reviveButton.addEventListener('click', () => {
+  if (!select.value) return;
+  window.stickmanAPI.sendChatMessage(select.value, '💖 Te acaban de revivir de la muerte. ¡Bienvenido de nuevo a la vida!');
   window.close();
 });
 

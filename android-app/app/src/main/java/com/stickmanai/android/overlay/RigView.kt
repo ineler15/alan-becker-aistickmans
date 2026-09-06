@@ -16,11 +16,15 @@ import android.view.View
  */
 class RigView(
     context: Context,
-    private val figure: RigFigure,
+    figure: RigFigure,
     private val hasFace: Boolean = false,
     private val accessory: String = "none",
 ) : View(context) {
 
+    // Swappable so the kitchen prop can cycle its background stations (KitchenOverlay.nextStation)
+    // - same idea as the desktop's character:rig IPC. Recomputed restBounds keep the fit-and-center
+    // scale locked to each new rig's own rest pose.
+    private var figure: RigFigure = figure
     var pose: Pose = emptyMap()
         set(value) {
             field = value
@@ -40,7 +44,16 @@ class RigView(
             invalidate()
         }
 
-    private val restBounds = RigLayout.bounds(RigLayout.layout(figure.root, figure.bodyColor, emptyMap()))
+    // Food/drink prop mode (FoodPropOverlay): the whole rig is drawn clipped to a shrinking wedge
+    // so each bite visibly removes a slice (plus a per-bite jiggle), and drink mode rotates the
+    // rig (a cup) by the tilt angle, synced with the swallow timeline in OverlayService - exactly
+    // the desktop's character.js foodBites/drinkTilt behavior.
+    private var foodBitesTotal = 0
+    private var foodBitesLeft = 0
+    private var foodJiggleRad = 0f
+    private var drinkTiltDeg = 0f
+
+    private var restBounds = RigLayout.bounds(RigLayout.layout(figure.root, figure.bodyColor, emptyMap()))
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -50,6 +63,34 @@ class RigView(
     private val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = 2f
+    }
+
+    fun setFigure(newFigure: RigFigure) {
+        figure = newFigure
+        restBounds = RigLayout.bounds(RigLayout.layout(figure.root, figure.bodyColor, emptyMap()))
+        invalidate()
+    }
+
+    /** Puts the whole rig in "food" mode: `foodBites` total bites to wedge-clip away. */
+    fun setFoodMode(foodBites: Int) {
+        foodBitesTotal = foodBites
+        foodBitesLeft = foodBites
+        foodJiggleRad = 0f
+        drinkTiltDeg = 0f
+        invalidate()
+    }
+
+    /** Per-bite update: remaining bites + a small random jiggle (in radians), like character.js. */
+    fun setFoodBites(bitesLeft: Int, jiggle: Float) {
+        foodBitesLeft = bitesLeft.coerceIn(0, foodBitesTotal)
+        foodJiggleRad = jiggle
+        invalidate()
+    }
+
+    /** Drink swallow: tilt the rig (a cup) by this many degrees; 0 = upright. */
+    fun setDrinkTilt(deg: Float) {
+        drinkTiltDeg = deg
+        invalidate()
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -67,6 +108,37 @@ class RigView(
         val offY = height / 2f - poseBounds.centerY() * scale
 
         fun tx(p: PointF) = PointF(p.x * scale + offX, p.y * scale + offY)
+
+        // Food mode: clip the whole rig draw to a shrinking wedge (each bite removes a slice) and
+        // jiggle it per bite / rotate it for drinking - around the rig box's center so it stays
+        // anchored regardless of pose. Mirrors character.js's foodBites/drinkTilt handling.
+        var clipCenter: PointF? = null
+        if (foodBitesTotal > 0 || drinkTiltDeg != 0f) {
+            clipCenter = tx(
+                PointF(restBounds.centerX(), restBounds.centerY())
+            )
+            canvas.save()
+            if (foodJiggleRad != 0f) {
+                canvas.rotate(Math.toDegrees(foodJiggleRad.toDouble()).toFloat(), clipCenter.x, clipCenter.y)
+            }
+            if (drinkTiltDeg != 0f) {
+                canvas.rotate(drinkTiltDeg, clipCenter.x, clipCenter.y)
+            }
+            if (foodBitesTotal > 0) {
+                val radius = maxOf(restBounds.width(), restBounds.height()) / 2f * scale + 4f
+                val remaining = (foodBitesLeft.toFloat() / foodBitesTotal).coerceIn(0f, 1f)
+                val path = android.graphics.Path().apply {
+                    moveTo(clipCenter.x, clipCenter.y)
+                    addArc(
+                        clipCenter.x - radius, clipCenter.y - radius,
+                        clipCenter.x + radius, clipCenter.y + radius,
+                        -90f, remaining * 360f,
+                    )
+                    close()
+                }
+                canvas.clipPath(path)
+            }
+        }
 
         // Curved-radius segments (segment_curve_radius != 0) are how some rigs build a "circle"
         // out of plain bones instead of a Circle node (see e.g. TCO/TDL/TSC/Victim heads) -
@@ -101,6 +173,75 @@ class RigView(
                 }
                 headCenter = center
                 headRadius = r
+                i++
+                continue
+            }
+
+            // Polygon nodes (kitchen/food props): Ellipse fills an ellipse centered on the segment
+            // (rx = l/2 along the bone, ry = th/2 across, canvas rotated to the bone's angle -
+            // same as character.js's ellipse branch), Triangle/Trapezoid fill their corner polygon
+            // computed in RigLayout.polygonCorners. Honoring hollow/outline like the circle branch
+            // keeps these consistent with how Stick Nodes draws non-stroke nodes; rounded
+            // trapezoid ends (rdS/rdE) get a filled disc of that end's width, like the desktop.
+            if (bone.nodeType == "Ellipse") {
+                val (rx, ry) = RigLayout.ellipseRadii(bone)
+                val center = tx(RigLayout.ellipseCenter(bone))
+                val rad = -Math.toDegrees(
+                    Math.atan2((bone.end.y - bone.start.y).toDouble(), (bone.end.x - bone.start.x).toDouble())
+                ).toFloat()
+                val path = android.graphics.Path().apply {
+                    addOval(
+                        android.graphics.RectF(
+                            center.x - rx * scale, center.y - ry * scale,
+                            center.x + rx * scale, center.y + ry * scale,
+                        ),
+                        android.graphics.Path.Direction.CW,
+                    )
+                }
+                canvas.save()
+                canvas.rotate(rad, center.x, center.y)
+                if (!bone.hollow) {
+                    fillPaint.color = bone.color
+                    canvas.drawPath(path, fillPaint)
+                }
+                if (bone.outline || bone.hollow) {
+                    outlinePaint.color = bone.outlineColor
+                    canvas.drawPath(path, outlinePaint)
+                }
+                canvas.restore()
+                i++
+                continue
+            }
+
+            if (bone.nodeType == "Triangle" || bone.nodeType == "Trapezoid") {
+                val corners = RigLayout.polygonCorners(bone)
+                val path = android.graphics.Path()
+                corners.forEachIndexed { idx, c ->
+                    val p = tx(c)
+                    if (idx == 0) path.moveTo(p.x, p.y) else path.lineTo(p.x, p.y)
+                }
+                path.close()
+                if (!bone.hollow) {
+                    fillPaint.color = bone.color
+                    canvas.drawPath(path, fillPaint)
+                }
+                if (bone.outline || bone.hollow) {
+                    outlinePaint.color = bone.outlineColor
+                    canvas.drawPath(path, outlinePaint)
+                }
+                if (bone.nodeType == "Trapezoid") {
+                    // Rounded trapezoid ends - cap each end with a filled disc of that end's width.
+                    if (bone.trapezoidRoundedStart) {
+                        val s = tx(bone.start)
+                        fillPaint.color = bone.color
+                        canvas.drawCircle(s.x, s.y, bone.trapezoidHalfStart.coerceAtLeast(1f) * scale, fillPaint)
+                    }
+                    if (bone.trapezoidRoundedEnd) {
+                        val e = tx(bone.end)
+                        fillPaint.color = bone.color
+                        canvas.drawCircle(e.x, e.y, bone.trapezoidHalfEnd.coerceAtLeast(1f) * scale, fillPaint)
+                    }
+                }
                 i++
                 continue
             }
@@ -150,6 +291,10 @@ class RigView(
             canvas.drawLine(s.x, s.y, e.x, e.y, strokePaint)
             i++
         }
+
+        // Pop the food/drink canvas transform so the face (and any future overlays) aren't
+        // clipped/rotated with the wedge-shorn food.
+        if (clipCenter != null) canvas.restore()
 
         headCenter?.let { center ->
             if (hasFace) FaceRenderer.drawFace(canvas, center.x, center.y, headRadius, eyeStyle, mouthStyle)

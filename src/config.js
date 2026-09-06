@@ -128,6 +128,13 @@ const config = {
   get attentionFocus() {
     return process.env.ATTENTION_FOCUS === 'mouse' ? 'mouse' : 'camera';
   },
+  // Survival system (vida/hambre/sed): stat bars over each character, slow hunger/thirst drain,
+  // eat/drink only at the kitchen, fight-induced damage, and death (manual revive from the chat).
+  // Toggleable in Configuracion - when off, stats stay full, nobody fights, nobody dies. Default
+  // on, since this is an opt-out feature (see pcSettings.survivalEnabled).
+  get survivalEnabled() {
+    return process.env.ENABLE_SURVIVAL !== '0';
+  },
   stickmanColor: process.env.STICKMAN_COLOR || '#111111',
   shimeji: {
     javaPath: process.env.SHIMEJI_JAVA_PATH || 'C:\\Program Files (x86)\\Java\\jre1.8.0_501\\bin\\javaw.exe',

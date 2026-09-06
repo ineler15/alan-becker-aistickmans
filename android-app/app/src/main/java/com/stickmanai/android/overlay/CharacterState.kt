@@ -42,6 +42,10 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
         // configured API key (see Prefs.apiKeyFor) never gets an AI decision at all, so without
         // this it would otherwise stand there forever.
         const val IDLE_WALK_TIMEOUT_MS = 6000L
+        // Eat/drink gesture lengths (OverlayService's FoodPropOverlay bite/gulp timeline runs
+        // alongside - the food window shrinks bite by bite over the same window).
+        const val EAT_DURATION_MS = 5000L
+        const val DRINK_DURATION_MS = 4200L
         // Same vocabulary as FaceRenderer.EYE_STYLES/MOUTH_STYLES - duplicated since that one
         // lives in the view layer and this is a plain state class with no Android view dependency.
         // Independent axes (not a bundled "emotion") so the AI can mix any eyes with any mouth.
@@ -61,6 +65,19 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
     var x: Int = screenWidth / 2
     var y: Int = floorY
     var lookRight: Boolean = true
+
+    // Timed eat/drink gestures (OverlayService's FoodPropOverlay): arm-to-mouth chewing and
+    // head-back gulping mirror the survival system's eat/drink actions. Both self-expire.
+    private var eating = false
+    private var drinking = false
+    private var eatingUntil = 0L
+    private var drinkingUntil = 0L
+
+    // Dead (survival system, hp reaching 0): lies down, all movement/AI stops, only a user chat
+    // message revives (OverlayService). Prefs.stats holds the authoritative hp/dead persistence -
+    // this flag exists so the state machine renders/behaves dead while that lives next to it.
+    var dead = false
+        private set
 
     var beingDragged = false
     private var falling = false
@@ -113,6 +130,8 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
         falling = false
         loopEmotion = null
         customAnimation = null
+        eating = false
+        drinking = false
         moving = true
         running = run
         moveTargetX = targetX.coerceIn(0, screenWidth)
@@ -125,6 +144,8 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
         climbing = false
         loopEmotion = null
         customAnimation = null
+        eating = false
+        drinking = false
         falling = true
         fallStartedAt = System.currentTimeMillis()
     }
@@ -135,6 +156,8 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
         climbSide = side
         moving = false
         loopEmotion = null
+        eating = false
+        drinking = false
         frame = 0
         frameCounter = 0
         climbTargetY = Random.nextInt((screenHeight * 0.1).toInt(), (screenHeight * 0.5).toInt())
@@ -154,6 +177,8 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
         climbing = false
         moving = false
         loopEmotion = null
+        eating = false
+        drinking = false
         if (sleeping) wakeUp()
         customAnimation = keyframes.take(MAX_CUSTOM_KEYFRAMES).map {
             it.copy(
@@ -185,8 +210,61 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
         moving = false
         falling = false
         customAnimation = null
+        eating = false
+        drinking = false
         if (state == "sleep") { startSleeping(); return }
         loopEmotion = state
+        frame = 0
+        frameCounter = 0
+    }
+
+    // Killed by the fight action or by starvation (hp <= 0) - see Prefs.stats.
+    fun kill() {
+        dead = true
+        beingDragged = false
+        moving = false
+        falling = false
+        climbing = false
+        loopEmotion = null
+        customAnimation = null
+        eating = false
+        drinking = false
+        speechText = null
+    }
+
+    fun revive() {
+        dead = false
+        awakeSinceMs = System.currentTimeMillis()
+    }
+
+    // Timed eat/drink gestures driven by OverlayService's FoodPropOverlay timeline - stop
+    // walking/idling and chew or gulp for the whole bite/gulp window.
+    fun startEat() {
+        lastActiveAt = System.currentTimeMillis()
+        beingDragged = false
+        falling = false
+        moving = false
+        climbing = false
+        customAnimation = null
+        drinking = false
+        if (sleeping) wakeUp()
+        eating = true
+        eatingUntil = System.currentTimeMillis() + EAT_DURATION_MS
+        frame = 0
+        frameCounter = 0
+    }
+
+    fun startDrink() {
+        lastActiveAt = System.currentTimeMillis()
+        beingDragged = false
+        falling = false
+        moving = false
+        climbing = false
+        customAnimation = null
+        eating = false
+        if (sleeping) wakeUp()
+        drinking = true
+        drinkingUntil = System.currentTimeMillis() + DRINK_DURATION_MS
         frame = 0
         frameCounter = 0
     }
@@ -214,7 +292,7 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
         frameCounter = 0
     }
 
-    private fun wakeUp() {
+    fun wakeUp() {
         sleeping = false
         awakeSinceMs = System.currentTimeMillis()
     }
@@ -255,6 +333,17 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
     fun tick(): FrameKind {
         if (System.currentTimeMillis() > sayUntil) speechText = null
 
+        // Dead outranks everything else - the character stays lying down (reuse the sleep pose),
+        // won't wander on its own, and the AI loop skips its turns entirely (OverlayService).
+        if (dead) {
+            speechText = null
+            moving = false
+            falling = false
+            climbing = false
+            customAnimation = null
+            return FrameKind.Sleep(0)
+        }
+
         if (beingDragged) {
             if (sleeping) wakeUp()
             customAnimation = null
@@ -278,6 +367,33 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
                 customAnimation = null
             } else {
                 return FrameKind.Custom(customAccumulatedAngles + keyframes[customIndex].angles)
+            }
+        }
+        // Eat/drink gesture (OverlayService's FoodPropOverlay timeline), after custom animation so
+        // a dragged character never gets yanked into the chew loop mid-carry. Self-expiring; the
+        // food window's bite timeline runs independently alongside.
+        if (eating) {
+            if (System.currentTimeMillis() > eatingUntil) {
+                eating = false
+            } else {
+                frameCounter++
+                if (frameCounter >= WALK_FRAME_TICKS) {
+                    frameCounter = 0
+                    frame++
+                }
+                return FrameKind.Chew(frame)
+            }
+        }
+        if (drinking) {
+            if (System.currentTimeMillis() > drinkingUntil) {
+                drinking = false
+            } else {
+                frameCounter++
+                if (frameCounter >= WALK_FRAME_TICKS) {
+                    frameCounter = 0
+                    frame++
+                }
+                return FrameKind.Drink(frame)
             }
         }
         if (sleeping) {
@@ -391,6 +507,8 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
         data class Climb(val frame: Int) : FrameKind()
         data class Sleep(val frame: Int) : FrameKind()
         data class Tired(val frame: Int) : FrameKind()
+        data class Chew(val frame: Int) : FrameKind()
+        data class Drink(val frame: Int) : FrameKind()
         data class Custom(val angles: Map<String, Float>) : FrameKind()
     }
 }

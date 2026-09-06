@@ -15,9 +15,13 @@ const fs = require('fs');
 const { pathToFileURL } = require('url');
 const { CharacterState, TICK_MS } = require('./characterState');
 const shimejiController = require('./jsShimejiController');
+const kitchen = require('./kitchen');
+const foodProp = require('./foodProp');
 const customCharacters = require('../customCharacters');
 const input = require('../actions/input');
 const pointerHighlight = require('../ui/pointerHighlight');
+const config = require('../config');
+const survival = require('../memory/survival');
 
 // Android's equivalent overlay window is a 128dp square (CharacterOverlay.kt's sizePx) - these
 // were never tuned to match and ended up much bigger on PC. Same aspect ratio as before, scaled
@@ -35,6 +39,15 @@ const BUBBLE_TOP_MARGIN = 50;
 const WINDOW_WIDTH = RIG_WIDTH + BUBBLE_SIDE_MARGIN * 2;
 const WINDOW_HEIGHT = RIG_HEIGHT + BUBBLE_TOP_MARGIN;
 const DRAG_END_QUIET_MS = 150;
+
+// Survival drain cadence (only when config.survivalEnabled): every poll the character gets
+// hungrier/thirstier by a fraction, and once either reaches 0 it starts losing hp instead. Rates
+// paced so a well-fed character lasts a good while without the user noticing the drain, but
+// visible enough in the bars to matter. hp hitting 0 kills it (survival.js + state.kill()).
+const SURVIVAL_POLL_MS = 10000;
+const HUNGER_PER_POLL = 0.5;
+const THIRST_PER_POLL = 0.75;
+const HP_LOSS_PER_POLL_STARVED = 1.5;
 
 let entries = [];
 let tickTimer = null;
@@ -137,6 +150,16 @@ function start(characters) {
     return entry;
   });
 
+  // Life/hunger/thirst is off: undo any previous session's death/damage so nobody starts the app
+  // dead or starving just because the toggle used to be on.
+  if (!config.survivalEnabled) {
+    for (const entry of entries) {
+      survival.reset(entry.id);
+      entry.state.revive();
+    }
+  }
+
+  kitchen.start();
   tickTimer = setInterval(tick, TICK_MS);
 }
 
@@ -156,6 +179,23 @@ async function tick() {
     if (entry.state.ridingMouse && mousePos) {
       pointerHighlight.showFor(entry.id, mousePos.x, mousePos.y);
     }
+
+    // Survival: slow real-time drain of hunger/thirst (then hp once empty) for alive characters
+    // when the feature is on. Uses Date.now() so the cadence isn't affected by anything
+    // throttling the tick loop - a paused AI loop (tray) doesn't pause the character's hunger.
+    if (config.survivalEnabled && !entry.state.dead) {
+      const now = Date.now();
+      if (!entry.lastSurvivalAt) entry.lastSurvivalAt = now;
+      if (now - entry.lastSurvivalAt >= SURVIVAL_POLL_MS) {
+        entry.lastSurvivalAt = now;
+        const stats = survival.get(entry.id);
+        const hunger = Math.max(0, stats.hunger - HUNGER_PER_POLL);
+        const thirst = Math.max(0, stats.thirst - THIRST_PER_POLL);
+        const hp = Math.max(0, stats.hp - (hunger <= 0 || thirst <= 0 ? HP_LOSS_PER_POLL_STARVED : 0));
+        survival.set(entry.id, { hp, hunger, thirst, dead: hp <= 0 });
+        if (hp <= 0) entry.state.kill();
+      }
+    }
     // While being dragged, the OS is already moving the window (see the 'move' listener above) -
     // repositioning it here too would fight the in-progress drag instead of just following it.
     if (!entry.state.beingDragged) {
@@ -171,6 +211,8 @@ async function tick() {
       speechText: entry.state.speechText,
       eyeStyle: entry.state.eyeStyle,
       mouthStyle: entry.state.mouthStyle,
+      dead: entry.state.dead,
+      stats: config.survivalEnabled ? survival.get(entry.id) : null,
     });
   }
 }
@@ -184,6 +226,8 @@ function stop() {
     if (!entry.win.isDestroyed()) entry.win.close();
   }
   entries = [];
+  kitchen.stop();
+  foodProp.stop();
 }
 
 module.exports = { start, stop };

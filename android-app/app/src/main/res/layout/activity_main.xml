@@ -50,6 +50,13 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp" />
 
+        <CheckBox
+            android:id="@+id/checkSurvivalEnabled"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/survival_enabled" />
+
         <LinearLayout
             android:id="@+id/characterList"
             android:layout_width="match_parent"

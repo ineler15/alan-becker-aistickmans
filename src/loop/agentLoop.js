@@ -2,6 +2,9 @@ const config = require('../config');
 const history = require('../memory/history');
 const executor = require('../actions/executor');
 const { getProvider } = require('../ai/provider');
+const { loreFor } = require('../ai/characterLore');
+const survival = require('../memory/survival');
+const kitchen = require('../jsEngine/kitchen');
 const { capturePerception, cropForCharacter } = require('../../dist/perception');
 const shimeji = require('../jsEngine/jsShimejiController');
 const CHARACTERS = require('../characters');
@@ -216,6 +219,11 @@ async function tickCharacter(character, perception, userMessageText, mousePositi
           ? 'ATENCION: tu principal foco ahora es el mouse del usuario. Mirá donde esta el cursor (mousePosition) y reacciona: segui su movimiento, comentalo, divertite/cerca de el. La camara y la pantalla siguen llegando, pero el cursor es lo importante.'
           : 'ATENCION: tu principal foco ahora es la camara webcam (la persona mirandote). Prestale mas atencion a la foto/imagen de la persona que a la posicion del cursor - la posicion del mouse (mousePosition) te llega igual, pero no es tu prioridad.',
       personality:
+        // Canon lore (src/ai/characterLore.js) first - a fixed "who you are" layer below any
+        // persona the character defines for itself, so fresh characters still know their Alan
+        // Becker origin without needing define_personality. Same prepend trick as genderLine:
+        // every provider embeds context.personality verbatim, so this reaches all of them.
+        (loreFor(characterId) ? loreFor(characterId) + '\n\n' : '') +
         genderLine +
         partnerLine +
         (selfPersonality.load(characterId) ||
@@ -227,6 +235,23 @@ async function tickCharacter(character, perception, userMessageText, mousePositi
       userMessage: userMessageText || null,
       forceSay: (turnsSinceSayById.get(characterId) || 0) >= SILENT_TURN_LIMIT,
     };
+
+    // Survival system context: the character's own life/hunger/thirst, where the kitchen is, and
+    // the rules for eating/drinking/fighting. Only present when the feature is on.
+    if (config.survivalEnabled) {
+      const stats = survival.get(characterId);
+      const kitchenPos = kitchen.getPosition();
+      context.stats = stats;
+      context.kitchen = kitchenPos;
+      context.survivalNote =
+        `SISTEMA DE VIDA/HAMBRE/SED: tu vida es ${Math.round(stats.hp)}/100, tu hambre ${Math.round(stats.hunger)}/100 ` +
+        `y tu sed ${Math.round(stats.thirst)}/100. Si el hambre o la sed llegan a 0 perdes vida poco a poco ` +
+        `hasta morir. Para comer (eat) o beber (drink) tenes que ESTAR EN la cocina${
+          kitchenPos ? `, que esta en x=${Math.round(kitchenPos.x)}, y=${Math.round(kitchenPos.y)}` : ' - todavia no hay cocina en este lugar'
+        } - si estas lejos, camina hasta ahi con walk_to (destino x=${kitchenPos ? Math.round(kitchenPos.x) : ''}) y recien ahi usa eat/drink. ` +
+        `Con fight podes pegarle a otro stickman que este cerca tuyo (menos de ~100px) y bajarle su vida ` +
+        `hasta que muera (luego el usuario lo revive). Si vos estas muerto, no podes hacer nada hasta que el usuario te reviva.`;
+    }
 
     let { tool, args } = await withTimeout(
       provider.decide(context),
@@ -334,6 +359,21 @@ async function tick() {
     if (!awakeSinceById.has(character.id)) awakeSinceById.set(character.id, Date.now());
     // Each character only gets a message that was aimed specifically at it.
     const pendingUserMessage = userMessage.consume(character.id);
+
+    // Dead (survival system, hp 0): the character lies still and the AI loop skips its turns so
+    // it can't decide anything or wander. The only way back is a chat message from the user -
+    // that's the "revivirlo manualmente" the user asked for; it revives AND lets it answer the
+    // message this same round (falls through to tickCharacter below).
+    const deadEntry = config.survivalEnabled ? shimeji.get(character.id) : null;
+    if (deadEntry && deadEntry.state.dead) {
+      if (pendingUserMessage) {
+        survival.revive(character.id);
+        deadEntry.state.revive();
+        wakeUp(character.id);
+      } else {
+        continue;
+      }
+    }
 
     if (sleepStartedAtById.has(character.id)) {
       if (pendingUserMessage) {

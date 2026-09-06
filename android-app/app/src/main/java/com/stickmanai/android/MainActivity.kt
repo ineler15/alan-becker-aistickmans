@@ -56,6 +56,13 @@ class MainActivity : AppCompatActivity() {
         binding.checkAllowScreenControl.setOnCheckedChangeListener { _, checked ->
             Prefs.setAllowScreenControl(this, checked)
         }
+        binding.checkSurvivalEnabled.isChecked = Prefs.survivalEnabled(this)
+        binding.checkSurvivalEnabled.setOnCheckedChangeListener { _, checked ->
+            Prefs.setSurvivalEnabled(this, checked)
+            // Turning the system off wipes everyone back to full stats (and alive) - mirrors PC's
+            // jsCharacterEngine.js startup reset. Turning it on again starts everyone fresh too.
+            if (!checked) Prefs.resetAllSurvival(this)
+        }
         binding.spinnerAttentionFocus.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, attentionOptions)
         binding.spinnerAttentionFocus.setSelection(if (Prefs.attentionFocus(this) == "touch") 1 else 0)
 

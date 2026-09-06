@@ -184,6 +184,35 @@
     });
   }
 
+  // Eating: the "holding the food" arm raised toward the mouth, head/torso ducked into the bite,
+  // with a small fast mastication bob (torso + raised arm pulse) between bites. Drink is the
+  // mirror gesture - leaning the torso back to tilt the head up and swallow.
+  function chewPose(paths, rest, frame) {
+    const period = 5;
+    const phase = (TWO_PI * (frame % period)) / period;
+    const chew = 6 * Math.sin(phase);
+    return byPath(paths, {
+      torso: rest.torsoLower - 6 + chew,
+      arm1: rest.arm1 - 55 + chew,
+      arm2: rest.arm2 + 30,
+      leg1: rest.leg1 + 6,
+      leg2: rest.leg2 + 6,
+    });
+  }
+
+  function drinkPose(paths, rest, frame) {
+    const period = 5;
+    const phase = (TWO_PI * (frame % period)) / period;
+    const gulp = 4 * Math.sin(phase);
+    return byPath(paths, {
+      torso: rest.torsoLower + 12 + gulp * 0.5,
+      arm1: rest.arm1 - 60,
+      arm2: rest.arm2 + 40,
+      leg1: rest.leg1 + 8,
+      leg2: rest.leg2 + 8,
+    });
+  }
+
   function sleepPose(paths, rest, frame) {
     const breathe = 4 * Math.sin((TWO_PI * frame) / 20);
     return byPath(paths, {
@@ -246,6 +275,10 @@
         return sleepPose(paths, rest, descriptor.frame || 0);
       case 'tired':
         return tiredPose(paths, rest);
+      case 'chew':
+        return chewPose(paths, rest, descriptor.frame || 0);
+      case 'drink':
+        return drinkPose(paths, rest, descriptor.frame || 0);
       case 'custom':
         return customPose(paths, rest, descriptor.angles);
       default:

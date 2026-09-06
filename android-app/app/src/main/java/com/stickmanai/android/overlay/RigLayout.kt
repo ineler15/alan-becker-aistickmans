@@ -22,6 +22,15 @@ data class Bone(
     val outline: Boolean,
     val outlineColor: Int,
     val curveRadius: Float,
+    // Polygon fields (Ellipse/Triangle/Trapezoid), copied from the RigNode so RigView can draw
+    // filled shapes without reaching back into the tree - see RigModel.kt for field semantics.
+    val triangleType: String,
+    val triangleFlipped: Boolean,
+    val triangleUpsideDown: Boolean,
+    val trapezoidHalfStart: Float,
+    val trapezoidHalfEnd: Float,
+    val trapezoidRoundedStart: Boolean,
+    val trapezoidRoundedEnd: Boolean,
 )
 
 /**
@@ -62,6 +71,13 @@ object RigLayout {
                         outline = node.outline,
                         outlineColor = node.outlineColor ?: android.graphics.Color.BLACK,
                         curveRadius = node.curveRadius,
+                        triangleType = node.triangleType ?: "",
+                        triangleFlipped = node.triangleFlipped,
+                        triangleUpsideDown = node.triangleUpsideDown,
+                        trapezoidHalfStart = (if (node.useTrapezoidThicknessStart && node.trapezoidThicknessStart > 0f) node.trapezoidThicknessStart else node.thickness) / 2f,
+                        trapezoidHalfEnd = (if (node.useTrapezoidThicknessEnd && node.trapezoidThicknessEnd > 0f) node.trapezoidThicknessEnd else node.thickness) / 2f,
+                        trapezoidRoundedStart = node.trapezoidRoundedStart,
+                        trapezoidRoundedEnd = node.trapezoidRoundedEnd,
                     )
                 )
             }
@@ -89,6 +105,65 @@ object RigLayout {
     /** Diameter-to-radius factor matched live against the prototype - see sn_proto_wasm_renderer memory. */
     const val CIRCLE_RADIUS_FACTOR = 0.65f
 
+    // Unit vector perpendicular to a rig-space segment (used for polygon base/width extents) -
+    // same perpDir() helper as the desktop renderer's character.js.
+    private fun perpDir(dx: Float, dy: Float): PointF {
+        val dist = hypot(dx.toDouble(), dy.toDouble()).toFloat().coerceAtLeast(1e-3f)
+        return PointF(-dy / dist, dx / dist)
+    }
+
+    /**
+     * Corner points (model space) of a polygon bone, matching the desktop's triangleCorners()/
+     * trapezoidCorners() in renderer/character.js - same math, so the kitchen/pizza rigs render
+     * identically on both platforms.
+     */
+    fun polygonCorners(bone: Bone): List<PointF> = when (bone.nodeType) {
+        "Triangle" -> {
+            val p = perpDir(bone.end.x - bone.start.x, bone.end.y - bone.start.y)
+            val h = (bone.thickness.coerceAtLeast(1f)) / 2f
+            if (bone.triangleUpsideDown) {
+                listOf(
+                    PointF(bone.start.x - p.x * h, bone.start.y - p.y * h),
+                    PointF(bone.start.x + p.x * h, bone.start.y + p.y * h),
+                    bone.end,
+                )
+            } else if (bone.triangleType == "RightTriangle") {
+                val s = if (bone.triangleFlipped) -1f else 1f
+                listOf(
+                    bone.start,
+                    PointF(bone.start.x + p.x * h * s, bone.start.y + p.y * h * s),
+                    bone.end,
+                )
+            } else {
+                listOf(
+                    PointF(bone.start.x - p.x * h, bone.start.y - p.y * h),
+                    PointF(bone.start.x + p.x * h, bone.start.y + p.y * h),
+                    bone.end,
+                )
+            }
+        }
+        "Trapezoid" -> {
+            val p = perpDir(bone.end.x - bone.start.x, bone.end.y - bone.start.y)
+            val hs = bone.trapezoidHalfStart.coerceAtLeast(1f)
+            val he = bone.trapezoidHalfEnd.coerceAtLeast(1f)
+            listOf(
+                PointF(bone.start.x + p.x * hs, bone.start.y + p.y * hs),
+                PointF(bone.start.x - p.x * hs, bone.start.y - p.y * hs),
+                PointF(bone.end.x - p.x * he, bone.end.y - p.y * he),
+                PointF(bone.end.x + p.x * he, bone.end.y + p.y * he),
+            )
+        }
+        else -> emptyList()
+    }
+
+    /** Model-space ellipse center (midpoint of the segment) - used by both RapView drawing and bounds(). */
+    fun ellipseCenter(bone: Bone): PointF =
+        PointF((bone.start.x + bone.end.x) / 2f, (bone.start.y + bone.end.y) / 2f)
+
+    /** Model-space ellipse radii along/across the bone: rx = length/2, ry = thickness/2 (mirrors Stick Nodes + desktop). */
+    fun ellipseRadii(bone: Bone): Pair<Float, Float> =
+        (bone.length / 2f).coerceAtLeast(1f) to (bone.thickness / 2f).coerceAtLeast(1f)
+
     fun bounds(bones: List<Bone>): android.graphics.RectF {
         var minX = Float.MAX_VALUE
         var minY = Float.MAX_VALUE
@@ -106,6 +181,13 @@ object RigLayout {
                 val c = circleCenter(bone, r)
                 include(c.x - r, c.y - r)
                 include(c.x + r, c.y + r)
+            } else if (bone.nodeType == "Ellipse") {
+                val (rx, ry) = ellipseRadii(bone)
+                val c = ellipseCenter(bone)
+                include(c.x - rx, c.y - ry)
+                include(c.x + rx, c.y + ry)
+            } else if (bone.nodeType == "Triangle" || bone.nodeType == "Trapezoid") {
+                for (corner in polygonCorners(bone)) include(corner.x, corner.y)
             } else {
                 include(bone.start.x, bone.start.y)
                 include(bone.end.x, bone.end.y)

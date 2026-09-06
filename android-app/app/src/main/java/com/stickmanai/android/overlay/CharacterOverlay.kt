@@ -72,6 +72,14 @@ class CharacterOverlay(
         visibility = View.GONE
     }
 
+    // Survival bars strip - created only while the system is on; hidden/removed entirely when
+    // not, so a toggled-off run looks exactly like it did before the feature existed.
+    private val barsW = (76 * density).toInt()
+    private val barsH = (22 * density).toInt()
+    private val statsView: SurvivalBarsView? = if (Prefs.survivalEnabled(context)) {
+        SurvivalBarsView(context, def.id)
+    } else null
+
     private val imageParams = WindowManager.LayoutParams(
         sizePx, sizePx,
         WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -88,6 +96,13 @@ class CharacterOverlay(
         PixelFormat.TRANSLUCENT,
     ).apply { gravity = Gravity.TOP or Gravity.START }
 
+    private val statsParams = WindowManager.LayoutParams(
+        barsW, barsH,
+        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+        PixelFormat.TRANSLUCENT,
+    ).apply { gravity = Gravity.TOP or Gravity.START }
+
     private var downRawX = 0f
     private var downRawY = 0f
     private var downAt = 0L
@@ -97,17 +112,25 @@ class CharacterOverlay(
         characterView.setOnTouchListener { _, event -> handleTouch(event) }
         windowManager.addView(characterView, imageParams)
         windowManager.addView(speechView, speechParams)
+        statsView?.let { statsView ->
+            windowManager.addView(statsView, statsParams)
+            statsView.stats = Prefs.survival(context, def.id)
+        }
         render()
     }
 
     fun detach() {
         try { windowManager.removeView(characterView) } catch (e: Exception) { /* already gone */ }
         try { windowManager.removeView(speechView) } catch (e: Exception) { /* already gone */ }
+        statsView?.let { try { windowManager.removeView(it) } catch (e: Exception) { /* already gone */ } }
     }
 
     private fun handleTouch(event: MotionEvent): Boolean {
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
+                // A dead character can't be dragged into life - only a user chat message revives
+                // it (OverlayService passes player messages straight through regardless).
+                if (state.dead) return false
                 downRawX = event.rawX
                 downRawY = event.rawY
                 downAt = System.currentTimeMillis()
@@ -151,7 +174,8 @@ class CharacterOverlay(
                 // No sprite art for these - sprite-backed characters just stand instead.
                 is CharacterState.FrameKind.Sit, is CharacterState.FrameKind.Angry,
                 is CharacterState.FrameKind.Climb, is CharacterState.FrameKind.Sleep,
-                is CharacterState.FrameKind.Tired, is CharacterState.FrameKind.Custom -> sprites!!.stand
+                is CharacterState.FrameKind.Tired, is CharacterState.FrameKind.Chew,
+                is CharacterState.FrameKind.Drink, is CharacterState.FrameKind.Custom -> sprites!!.stand
             }
             (characterView as ImageView).setImageBitmap(bitmap)
         }
@@ -187,12 +211,22 @@ class CharacterOverlay(
         if (TapAccessibilityService.isKeyboardVisible()) {
             characterView.visibility = View.GONE
             speechView.visibility = View.GONE
+            statsView?.visibility = View.GONE
             return
         }
         characterView.visibility = View.VISIBLE
         imageParams.x = state.x - sizePx / 2
         imageParams.y = state.y - sizePx
         windowManager.updateViewLayout(characterView, imageParams)
+
+        // Survival strip sits centered above the head, tracking the character every tick.
+        statsView?.let { view ->
+            view.visibility = View.VISIBLE
+            view.stats = Prefs.survival(context, def.id)
+            statsParams.x = imageParams.x + sizePx / 2 - barsW / 2
+            statsParams.y = (imageParams.y - barsH - (4 * density).toInt()).coerceAtLeast(0)
+            windowManager.updateViewLayout(view, statsParams)
+        }
 
         if (state.speechText != null) {
             speechView.text = state.speechText

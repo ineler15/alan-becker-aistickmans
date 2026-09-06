@@ -31,6 +31,10 @@ const DEFAULT_KEYFRAME_HOLD_MS = 400;
 // Autonomous wander: if nothing (AI decision or drag) has moved this character in a while, walk
 // somewhere on its own instead of just idling in place.
 const IDLE_WALK_TIMEOUT_MS = 6000;
+// Eat/drink performance length (foodProp.js runs the bite/gulp timeline alongside): long enough
+// for the food window to visibly shrink bite by bite before the character settles back to idle.
+const EAT_DURATION_MS = 5000;
+const DRINK_DURATION_MS = 4200;
 // Same vocabulary as renderer/face.js's FaceRenderer - duplicated rather than shared since this
 // file runs in the main process (no `window`) and that one in the renderer. Independent axes (not
 // a bundled "emotion") so the AI can mix any eyes with any mouth.
@@ -53,6 +57,15 @@ class CharacterState {
     this.moving = false;
     this.running = false;
     this.moveTargetX = 0;
+
+    // Eat/drink performance (foodProp.js): timed gestures - arm-to-mouth chewing (kind 'chew') and
+    // head-back gulping (kind 'drink') - mirror the survival system's eat/drink actions so the
+    // character visibly eats while the food window shrinks next to it. Both self-expire; anything
+    // else that moves the character cancels whichever is running.
+    this.eating = false;
+    this.eatingUntil = 0;
+    this.drinking = false;
+    this.drinkingUntil = 0;
 
     // ride_mouse: rides along the REAL OS cursor position for a timed duration. See input.js's
     // getMousePosition() and jsCharacterEngine.js's tick(), which fetches it once per tick and
@@ -83,6 +96,31 @@ class CharacterState {
     // axes rather than one bundled "emotion" so the AI can mix any pair.
     this.eyeStyle = 'normal';
     this.mouthStyle = 'neutral';
+
+    // Dead (survival system, hp reaching 0): character lies in a sleep pose, all movement/AI
+    // stops, and only a user chat message revives it (agentLoop.js's tick()). survival.js tracks
+    // the actual hp/dead persistence - this flag exists so the state machine renders/behaves
+    // dead while the source of truth lives next to it.
+    this.dead = false;
+  }
+
+  // Killed by the fight action or by long-term starvation (hp <= 0) - see survival.js.
+  kill() {
+    this.dead = true;
+    this.beingDragged = false;
+    this.moving = false;
+    this.falling = false;
+    this.ridingMouse = false;
+    this.loopEmotion = null;
+    this.customAnimation = null;
+    this.eating = false;
+    this.drinking = false;
+    this.speechText = null;
+  }
+
+  revive() {
+    this.dead = false;
+    this.awakeSinceMs = Date.now();
   }
 
   startMoving(targetX, run) {
@@ -92,6 +130,8 @@ class CharacterState {
     this.ridingMouse = false;
     this.loopEmotion = null;
     this.customAnimation = null;
+    this.eating = false;
+    this.drinking = false;
     this.moving = true;
     this.running = !!run;
     this.moveTargetX = Math.min(this.screenWidth, Math.max(0, targetX));
@@ -108,8 +148,42 @@ class CharacterState {
     this.ridingMouse = false;
     this.loopEmotion = null;
     this.customAnimation = null;
+    this.eating = false;
+    this.drinking = false;
     this.falling = true;
     this.fallStartedAt = Date.now();
+  }
+
+  // Timed eat/drink gestures driven by foodProp.js's sequence - stop walking/idling and chew or
+  // gulp for the whole bite/gulp timeline. Wakes a sleeping character so eating is possible.
+  startEat() {
+    this.lastActiveAt = Date.now();
+    this.beingDragged = false;
+    this.falling = false;
+    this.moving = false;
+    this.ridingMouse = false;
+    this.customAnimation = null;
+    this.drinking = false;
+    if (this.sleeping) this._wakeUp();
+    this.eating = true;
+    this.eatingUntil = Date.now() + EAT_DURATION_MS;
+    this.frame = 0;
+    this.frameCounter = 0;
+  }
+
+  startDrink() {
+    this.lastActiveAt = Date.now();
+    this.beingDragged = false;
+    this.falling = false;
+    this.moving = false;
+    this.ridingMouse = false;
+    this.customAnimation = null;
+    this.eating = false;
+    if (this.sleeping) this._wakeUp();
+    this.drinking = true;
+    this.drinkingUntil = Date.now() + DRINK_DURATION_MS;
+    this.frame = 0;
+    this.frameCounter = 0;
   }
 
   // Rides along the real OS cursor position for `seconds` (default 6, capped 1-20) - see
@@ -121,6 +195,8 @@ class CharacterState {
     this.moving = false;
     this.loopEmotion = null;
     this.customAnimation = null;
+    this.eating = false;
+    this.drinking = false;
     if (this.sleeping) this._wakeUp();
     this.ridingMouse = true;
     this.rideMouseUntil = Date.now() + Math.min(20, Math.max(1, Number(seconds) || 6)) * 1000;
@@ -134,6 +210,8 @@ class CharacterState {
     this.moving = false;
     this.ridingMouse = false;
     this.loopEmotion = null;
+    this.eating = false;
+    this.drinking = false;
     if (this.sleeping) this._wakeUp();
     this.customAnimation = keyframes.slice(0, MAX_CUSTOM_KEYFRAMES).map((k) => ({
       angles: k.angles || {},
@@ -165,6 +243,8 @@ class CharacterState {
     this.falling = false;
     this.ridingMouse = false;
     this.customAnimation = null;
+    this.eating = false;
+    this.drinking = false;
     if (state === 'sleep') {
       this._startSleeping();
       return;
@@ -238,6 +318,18 @@ class CharacterState {
   tick(mousePos) {
     if (Date.now() > this.sayUntil) this.speechText = null;
 
+    // Dead outranks everything else - the character stays lying down (reuse the sleep pose),
+    // can't be dragged into life, won't wander on its own, and the AI loop skips its turns
+    // entirely (agentLoop.js). The descriptor carries dead:true so the renderer draws the red X.
+    if (this.dead) {
+      this.speechText = null;
+      this.moving = false;
+      this.falling = false;
+      this.ridingMouse = false;
+      this.customAnimation = null;
+      return { kind: 'sleep', frame: 0, dead: true };
+    }
+
     if (this.beingDragged) {
       if (this.sleeping) this._wakeUp();
       this.customAnimation = null;
@@ -263,6 +355,34 @@ class CharacterState {
           this.frame++;
         }
         return { kind: 'pinch', frame: this.frame };
+      }
+    }
+
+    // Eat/drink gesture (foodProp.js), right after riding so a dragged character never gets yanked
+    // into the chew loop mid-carry. Self-expiring; the food window's bite timeline is the same
+    // length, run independently on the main process.
+    if (this.eating) {
+      if (Date.now() > this.eatingUntil) {
+        this.eating = false;
+      } else {
+        this.frameCounter++;
+        if (this.frameCounter >= WALK_FRAME_TICKS) {
+          this.frameCounter = 0;
+          this.frame++;
+        }
+        return { kind: 'chew', frame: this.frame };
+      }
+    }
+    if (this.drinking) {
+      if (Date.now() > this.drinkingUntil) {
+        this.drinking = false;
+      } else {
+        this.frameCounter++;
+        if (this.frameCounter >= WALK_FRAME_TICKS) {
+          this.frameCounter = 0;
+          this.frame++;
+        }
+        return { kind: 'drink', frame: this.frame };
       }
     }
 
