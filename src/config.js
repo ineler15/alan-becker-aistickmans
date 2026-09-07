@@ -124,9 +124,11 @@ const config = {
     return process.env.ALLOW_MOUSE_CONTROL === '1';
   },
   // Global attention preference injected into the AI context every turn: 'camera' (pay more
-  // attention to the webcam frame) or 'mouse' (pay more attention to the cursor position).
+  // attention to the webcam frame), 'mouse' (pay more attention to the cursor position),
+  // 'screen' (pay more attention to the screen screenshot) or 'all' (everything together).
   get attentionFocus() {
-    return process.env.ATTENTION_FOCUS === 'mouse' ? 'mouse' : 'camera';
+    const v = process.env.ATTENTION_FOCUS;
+    return v === 'mouse' || v === 'screen' || v === 'all' ? v : 'camera';
   },
   // Survival system (vida/hambre/sed): stat bars over each character, slow hunger/thirst drain,
   // eat/drink only at the kitchen, fight-induced damage, and death (manual revive from the chat).

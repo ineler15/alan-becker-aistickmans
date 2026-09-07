@@ -460,7 +460,7 @@ class CharacterState {
         this.frameCounter = 0;
         this.frame++;
       }
-      if (emotion === 'happy') return { kind: 'bounce', frame: this.frame };
+      if (emotion === 'happy' || emotion === 'jump') return { kind: 'bounce', frame: this.frame };
       if (emotion === 'angry') return { kind: 'angry', frame: this.frame };
       if (emotion === 'tired') return { kind: 'tired' };
       return { kind: 'trip', frame: this.frame };

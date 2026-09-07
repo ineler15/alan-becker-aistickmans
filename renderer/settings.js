@@ -164,7 +164,9 @@ async function init() {
   document.getElementById('sharedKey').value = collapseRepeatedKey(settings.sharedApiKey || '');
   document.getElementById('allowMouseControl').checked = !!settings.allowMouseControl;
   document.getElementById('survivalEnabled').checked = settings.survivalEnabled !== false;
-  document.getElementById('attentionFocus').value = settings.attentionFocus === 'mouse' ? 'mouse' : 'camera';
+  const att = settings.attentionFocus;
+  document.getElementById('attentionFocus').value =
+    att === 'mouse' || att === 'screen' || att === 'all' ? att : 'camera';
 
   document.getElementById('contextSaveBtn').addEventListener('click', () => {
     if (editingContextId) {

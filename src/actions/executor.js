@@ -1,5 +1,6 @@
 const { confirmAction, isInsideWorkspace } = require('../safety/confirm');
 const config = require('../config');
+const characters = require('../characters');
 const input = require('./input');
 const system = require('./system');
 const paint = require('./stickPaint');
@@ -25,6 +26,60 @@ const MOUSE_CONTROL_DISABLED_RESULT = {
 // in between, regardless of how many characters have mouse control enabled.
 const MOUSE_ACTION_COOLDOWN_MS = 15000;
 let lastMouseActionAt = 0;
+
+// If a character's spoken text announces a physical action instead of only naming the tool that
+// does it (the model narrates "¡Salto!" rather than also calling set_animation jump), actually
+// perform the announced action right after the say - saying it reads as really doing it. Kept as
+// a small fallback on top of the explicit tools (walk_to / set_animation still get priority when
+// the model uses them properly); this only resolves intent from speech.
+const JUMP_SPEECH_RE = /\b(salt(?:a|o|e|emos|aste|ando|ar|aremos|aré|às|aria|ábamos|òs|es|ó)|brinc(?:a|o|e|ando|emos|ar)|dar un salto)\b/i;
+// Movement verbs that imply walking regardless of a discoverable destination.
+const STRONG_MOVE_RE =
+  /\b(muev(?:e|o)\b|camina(?:ndo)?\b|caminar\b|camino\b|corr(?:e|o)\b|acercar(?:me)?\b|llegar (?:a |hasta )|pasear|paseando|salir a caminar)/i;
+// Weaker "voy/vamos/se va a X..." phrasing - only treated as movement when a real destination is
+// found (a known stickman or the kitchen), so "voy a saludar"/"vamos a bailar" don't start a walk.
+const WEAK_MOVE_RE = /\b(voy|vamos|vaya|ira|iré|me voy|se va|ve) (?:a |hacia |para |hasta )/i;
+// A "mueve/camina/corre" phrase that also implies running (rather than just walking).
+const RUN_SPEECH_RE = /\b(corr(?:e|o|iendo)|apuro|rapido|de prisa)\b/i;
+
+function resolveMoveTarget(text, characterId) {
+  const haystack = (text || '').toLowerCase();
+  for (const c of characters.ALL) {
+    if (!c.id || c.id === characterId) continue;
+    const label = String(c.displayName || c.id).toLowerCase();
+    if (haystack.includes(label) || haystack.includes(String(c.id).toLowerCase())) {
+      const target = shimeji.get(c.id);
+      if (target) return { x: target.state.x, label: c.displayName || c.id };
+    }
+  }
+  const kitchenPos = kitchen.getPosition();
+  if (kitchenPos && haystack.includes('cocin')) return { x: kitchenPos.x, label: 'la cocina' };
+  return null;
+}
+
+function reactToSayIntent(text, characterId) {
+  const speech = text || '';
+  const followUps = [];
+  if (JUMP_SPEECH_RE.test(speech)) {
+    shimeji.sendCommand(characterId, 'set_animation', { state: 'jump' });
+    followUps.push('salto');
+  }
+  const dest = resolveMoveTarget(speech, characterId);
+  if (STRONG_MOVE_RE.test(speech) || (dest && WEAK_MOVE_RE.test(speech))) {
+    const me = shimeji.get(characterId);
+    if (me) {
+      const run = RUN_SPEECH_RE.test(speech);
+      if (dest) {
+        me.state.startMoving(dest.x, run);
+        followUps.push(`camina hacia ${dest.label}`);
+      } else {
+        me.state.randomTarget(run);
+        followUps.push('camina un poco');
+      }
+    }
+  }
+  return followUps;
+}
 
 function mouseControlGate() {
   if (!config.allowMouseControl) return MOUSE_CONTROL_DISABLED_RESULT;
@@ -187,7 +242,14 @@ async function execute(name, args, characterId) {
       return { ok: true, result: 'cara actualizada' };
     case 'say':
       shimeji.sendCommand(characterId, 'say', { text: args.text });
-      return { ok: true, result: 'mensaje mostrado' };
+      // "Salta"/"se mueve a X" dichos en voz alta se hacen de verdad (ver reactToSayIntent).
+      {
+        const followUps = reactToSayIntent(args.text, characterId);
+        return {
+          ok: true,
+          result: followUps.length ? `mensaje mostrado (ademas: ${followUps.join(', ')})` : 'mensaje mostrado',
+        };
+      }
     case 'set_custom_animation': {
       // Same string-vs-array leniency as draw_in_paint's points - a tool-calling model may hand
       // back "keyframes" as a JSON-encoded string instead of a real array.

@@ -39,9 +39,10 @@ function load() {
       // bigger deal than any of the sandboxed actions (StickPaint, walking, etc.), so it needs an
       // explicit opt-in rather than working out of the box like everything else.
       allowMouseControl: false,
-      // Where the AI should pay more attention each decision turn: 'camera' (the webcam frame)
-      // or 'mouse' (the cursor's position, tracked via input.getMousePosition). Global, not per
-      // character - it only changes the emphasis in the prompt, both signals keep coming in.
+      // Where the AI should pay more attention each decision turn: 'camera' (the webcam frame),
+      // 'mouse' (the cursor's position), 'screen' (the screen screenshot) or 'all' (everything
+      // together). Global, not per character - it only changes the emphasis in the prompt, all
+      // the signals keep coming in.
       attentionFocus: 'camera',
       // Life/hunger/thirst system (bars, kitchen meals, fighting, death/revive). On by default
       // since it's the requested feature; unchecked in Configuracion the whole thing goes away
@@ -103,7 +104,8 @@ const KEY_ENV_VAR = {
 // see config.gemini.apiKeyFor) picks them up with no changes to that code at all.
 function applyToEnv(settings) {
   process.env.ALLOW_MOUSE_CONTROL = settings.allowMouseControl ? '1' : '0';
-  process.env.ATTENTION_FOCUS = settings.attentionFocus === 'mouse' ? 'mouse' : 'camera';
+  const focus = settings.attentionFocus;
+  process.env.ATTENTION_FOCUS = focus === 'mouse' || focus === 'screen' || focus === 'all' ? focus : 'camera';
   // `!== false` so settings files saved before survivalEnabled existed (no field) still default
   // to ON instead of silently turning the whole feature off on the next launch.
   process.env.ENABLE_SURVIVAL = settings.survivalEnabled === false ? '0' : '1';

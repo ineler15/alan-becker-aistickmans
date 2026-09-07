@@ -211,12 +211,17 @@ async function tickCharacter(character, perception, userMessageText, mousePositi
       webcamBase64: webcam.get(),
       // Where the user's real cursor is right now (absolute screen pixels, captured once per
       // round in tick()) + the global attention preference - the model should steer its gaze:
-      // 'mouse' = follow/watch the cursor, 'camera' = keep attention on the webcam frame.
+      // 'mouse' = follow/watch the cursor, 'screen' = read the screen, 'camera' = webcam frame,
+      // 'all' = everything together.
       ...(mousePosition ? { mousePosition } : {}),
       attentionFocus: config.attentionFocus,
       attentionNote:
         config.attentionFocus === 'mouse'
-          ? 'ATENCION: tu principal foco ahora es el mouse del usuario. Mirá donde esta el cursor (mousePosition) y reacciona: segui su movimiento, comentalo, divertite/cerca de el. La camara y la pantalla siguen llegando, pero el cursor es lo importante.'
+          ? 'ATENCION: tu principal foco ahora es el mouse del usuario. Mirá donde esta el cursor (mousePosition) y reacciona: segui su movimiento, comentalo, divertite/acercate a el. La camara y la pantalla siguen llegando, pero el cursor es lo importante.'
+          : config.attentionFocus === 'screen'
+          ? 'ATENCION: tu principal foco ahora es la PANTALLA (el screenshot de lo que se ve en el monitor). Analizala en detalle y reacciona a lo que veas ahi: ventanas, paginas, dibujos, lo que sea. La camara y el mouse siguen llegando, pero lo que esta en la pantalla es tu prioridad.'
+          : config.attentionFocus === 'all'
+          ? 'ATENCION: prestale atencion a TODO por igual - la camara (la persona), la posicion del mouse (mousePosition) y lo que se ve en la pantalla (screenshot). Elegi vos que es mas interesante este turno y reacciona a eso.'
           : 'ATENCION: tu principal foco ahora es la camara webcam (la persona mirandote). Prestale mas atencion a la foto/imagen de la persona que a la posicion del cursor - la posicion del mouse (mousePosition) te llega igual, pero no es tu prioridad.',
       personality:
         // Canon lore (src/ai/characterLore.js) first - a fixed "who you are" layer below any

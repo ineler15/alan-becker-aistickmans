@@ -204,7 +204,7 @@ const ACTIONS = [
     },
     risky: false,
   },
-  { name: 'say', desc: 'Muestra un mensaje en un globo de dialogo junto al personaje, para comunicarse con el usuario', params: { text: 'string' }, risky: false },
+  { name: 'say', desc: 'Muestra un mensaje en un globo de dialogo junto al personaje, para comunicarse con el usuario. NOTA: si en el texto anuncias una accion fisica, se ejecuta de verdad en ese momento - por ejemplo si decis "¡Salto!" te pones a saltar, o si decis "me muevo hacia <nombre de otro stickman>" o "voy a la cocina" caminas hasta ahi.', params: { text: 'string' }, risky: false },
   {
     name: 'define_personality',
     desc:
