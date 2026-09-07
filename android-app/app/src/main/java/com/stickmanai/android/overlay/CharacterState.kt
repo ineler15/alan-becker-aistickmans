@@ -464,7 +464,7 @@ class CharacterState(private val screenWidth: Int, private val screenHeight: Int
                 frame++
             }
             return when (it) {
-                "happy" -> FrameKind.Bounce(frame)
+                "happy", "jump" -> FrameKind.Bounce(frame)
                 "angry" -> FrameKind.Angry(frame)
                 "tired" -> FrameKind.Tired(frame)
                 else -> FrameKind.Trip(frame)

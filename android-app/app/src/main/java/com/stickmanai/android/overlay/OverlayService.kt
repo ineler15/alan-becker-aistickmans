@@ -432,6 +432,43 @@ class OverlayService : LifecycleService() {
         return tool to args
     }
 
+    // If a character's spoken text announces a physical action ("¡Salto!", "me muevo hacia
+    // Blue"), actually perform it right after the say - mirrors executor.js's reactToSayIntent on
+    // PC. Kept as a small fallback; explicit walk_to/set_animation still get priority.
+    private fun reactToSayIntent(overlay: CharacterOverlay, text: String) {
+        if (text.isBlank()) return
+        val lower = text.lowercase()
+        val jumpRe = Regex("\\b(salt(?:a|o|e|emos|aste|ando|ar|aremos|aré|às|aria|ábamos|òs|es|ó)|brinc(?:a|o|e|ando|emos|ar)|dar un salto)\\b", RegexOption.IGNORE_CASE)
+        val strongMoveRe = Regex("\\b(muev(?:e|o)\\b|camina(?:ndo)?\\b|caminar\\b|camino\\b|corr(?:e|o)\\b|acercar(?:me)?\\b|llegar (?:a |hasta )|pasear|paseando|salir a caminar)", RegexOption.IGNORE_CASE)
+        val weakMoveRe = Regex("\\b(voy|vamos|vaya|ira|iré|me voy|se va|ve) (?:a |hacia |para |hasta )", RegexOption.IGNORE_CASE)
+        val runRe = Regex("\\b(corr(?:e|o|iendo)|apuro|rapido|de prisa)\\b", RegexOption.IGNORE_CASE)
+        if (jumpRe.containsMatchIn(lower)) overlay.state.setEmotion("jump")
+        // Resolve "hacia <peer>" against local (same-device) characters; kitchen as a landmark.
+        var destPx: Int? = null
+        val destLabel: String?
+        val named = overlays.values.firstOrNull { o ->
+            o.def.id != overlay.def.id &&
+                (lower.contains(o.def.displayName.lowercase()) || lower.contains(o.def.id.lowercase()))
+        }
+        val kitchenPos = kitchenOverlay?.getPosition()
+        destLabel = when {
+            named != null -> {
+                destPx = named.state.x
+                named.def.displayName
+            }
+            kitchenPos != null && lower.contains("cocin") -> {
+                destPx = kitchenPos.first
+                "la cocina"
+            }
+            else -> null
+        }
+        if (strongMoveRe.containsMatchIn(lower) || (destPx != null && weakMoveRe.containsMatchIn(lower))) {
+            val run = runRe.containsMatchIn(lower)
+            if (destPx != null) overlay.state.startMoving(destPx, run)
+            else overlay.state.randomTarget(run)
+        }
+    }
+
     private fun applyDecision(overlay: CharacterOverlay, tool: String, args: JSONObject) {
         val metrics = resources.displayMetrics
         when (tool) {
@@ -441,7 +478,7 @@ class OverlayService : LifecycleService() {
             }
             "set_animation" -> {
                 val state = args.optString("state", "idle")
-                val validStates = setOf("happy", "trip", "sad", "scared", "sit", "tired", "sleep")
+                val validStates = setOf("happy", "jump", "trip", "sad", "scared", "sit", "tired", "sleep")
                 overlay.state.setEmotion(if (state in validStates) state else null)
             }
             "set_emotion" -> overlay.state.setFace(
@@ -454,6 +491,7 @@ class OverlayService : LifecycleService() {
                 if (text.isNotBlank()) {
                     com.stickmanai.android.chat.ChatNotifications.showSay(this, overlay.def.id, overlay.def.displayName, text)
                 }
+                reactToSayIntent(overlay, text)
             }
             "set_custom_animation" -> {
                 val keyframesJson = args.optJSONArray("keyframes")

@@ -61,14 +61,14 @@ object ActionsSchema {
         put(
             tool(
                 "set_animation",
-                "Cambia la pose de tu cuerpo. tired = te tiras cansado, sleep = te acostas a dormir " +
+                "Cambia la pose de tu cuerpo. jump = saltas, tired = te tiras cansado, sleep = te acostas a dormir " +
                     "(dejas de recibir turnos hasta que te despierten o pase un rato). Esto es solo el " +
                     "cuerpo - si tenes cara propia, sumale eyes/mouth a esta misma llamada para la " +
                     "expresion facial, no hace falta un turno aparte con set_emotion.",
                 withFaceParams(
                     JSONObject().put(
                         "state",
-                        prop("string", "Estado emocional", listOf("idle", "happy", "trip", "sad", "scared", "sit", "angry", "tired", "sleep"))
+                        prop("string", "Estado emocional", listOf("idle", "happy", "trip", "sad", "scared", "sit", "angry", "tired", "sleep", "jump"))
                     )
                 ),
                 listOf("state")
