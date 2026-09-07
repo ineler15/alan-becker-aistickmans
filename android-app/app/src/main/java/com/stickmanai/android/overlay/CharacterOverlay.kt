@@ -11,6 +11,7 @@ import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.TextView
 import com.stickmanai.android.CharacterDef
+import com.stickmanai.android.CrashReporter
 import com.stickmanai.android.Prefs
 import com.stickmanai.android.input.TapAccessibilityService
 
@@ -113,10 +114,18 @@ class CharacterOverlay(
         windowManager.addView(characterView, imageParams)
         windowManager.addView(speechView, speechParams)
         statsView?.let { statsView ->
-            windowManager.addView(statsView, statsParams)
-            statsView.stats = Prefs.survival(context, def.id)
+            try {
+                windowManager.addView(statsView, statsParams)
+                statsView.stats = Prefs.survival(context, def.id)
+            } catch (e: Throwable) {
+                CrashReporter.report(context, "barra de stats ${def.id}", e)
+            }
         }
-        render()
+        try {
+            render()
+        } catch (e: Throwable) {
+            CrashReporter.report(context, "render inicial ${def.id}", e)
+        }
     }
 
     fun detach() {

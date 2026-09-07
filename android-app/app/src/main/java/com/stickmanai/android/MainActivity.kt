@@ -45,6 +45,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        CrashReporter.install(this)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 

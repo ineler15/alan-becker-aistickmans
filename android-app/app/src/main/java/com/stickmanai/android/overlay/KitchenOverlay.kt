@@ -7,6 +7,7 @@ import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
+import com.stickmanai.android.CrashReporter
 import kotlin.random.Random
 
 /**
@@ -48,13 +49,17 @@ class KitchenOverlay(
         override fun run() {
             val view = rigView ?: return
             // Fade old station out, swap in the new one at full alpha, fade back in.
-            view.animate().alpha(0f).setDuration(500).withEndAction {
-                stationIndex = (stationIndex + 1) % stationIds.size
-                val next = RigFigure.forCharacterOrNull(context, stationIds[stationIndex]) ?: return@withEndAction
-                view.setFigure(next)
-                view.alpha = 0f
-                view.animate().alpha(1f).setDuration(500).start()
-            }.start()
+            try {
+                view.animate().alpha(0f).setDuration(500).withEndAction {
+                    stationIndex = (stationIndex + 1) % stationIds.size
+                    val next = RigFigure.forCharacterOrNull(context, stationIds[stationIndex]) ?: return@withEndAction
+                    view.setFigure(next)
+                    view.alpha = 0f
+                    view.animate().alpha(1f).setDuration(500).start()
+                }.start()
+            } catch (e: Throwable) {
+                CrashReporter.report(context, "cocina: cambiar estacion", e)
+            }
         }
     }
 

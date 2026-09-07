@@ -11,6 +11,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
+import com.stickmanai.android.CrashReporter
 import com.stickmanai.android.MainActivity
 import com.stickmanai.android.Prefs
 import com.stickmanai.android.allCharacters
@@ -132,16 +133,25 @@ class OverlayService : LifecycleService() {
             // Tapping a character used to open ChatActivity, which switched away from whatever
             // app was in front - that's now the ChatButtonOverlay's job instead (see below), so
             // there's nothing left for a tap to do here.
-            val overlay = CharacterOverlay(
-                this, character, windowManager, metrics.widthPixels, metrics.heightPixels
-            ) { }
-            overlay.attach()
-            overlays[character.id] = overlay
+            try {
+                val overlay = CharacterOverlay(
+                    this, character, windowManager, metrics.widthPixels, metrics.heightPixels
+                ) { }
+                overlay.attach()
+                overlays[character.id] = overlay
+            } catch (e: Throwable) {
+                CrashReporter.report(this, "crear personaje ${character.id}", e)
+            }
         }
         // Kitchen prop exists only while the survival system is on (eat/drink need somewhere to
         // happen); cycles its background stations as a visible "transition" whenever someone eats.
         if (Prefs.survivalEnabled(this) && kitchenOverlay == null) {
-            kitchenOverlay = KitchenOverlay(this, windowManager, metrics.widthPixels).also { it.attach() }
+            try {
+                kitchenOverlay = KitchenOverlay(this, windowManager, metrics.widthPixels).also { it.attach() }
+            } catch (e: Throwable) {
+                CrashReporter.report(this, "crear cocina", e)
+                kitchenOverlay = null
+            }
         }
         if (!::chatButton.isInitialized) {
             chatButton = ChatButtonOverlay(this, windowManager)
@@ -154,7 +164,11 @@ class OverlayService : LifecycleService() {
         val tickRunnable = object : Runnable {
             override fun run() {
                 if (!physicsRunning) return
-                overlays.values.forEach { it.tick() }
+                try {
+                    overlays.values.forEach { it.tick() }
+                } catch (e: Throwable) {
+                    CrashReporter.report(this@OverlayService, "physics tick", e)
+                }
                 mainHandler.postDelayed(this, CharacterState.TICK_MS)
             }
         }
@@ -171,7 +185,11 @@ class OverlayService : LifecycleService() {
                 val cameraBase64 = cameraCapture.captureBase64()
                 val screenBase64 = com.stickmanai.android.input.TapAccessibilityService.captureScreenshotBase64()
                 for (overlay in overlays.values.toList()) {
-                    tickCharacterAi(overlay, cameraBase64, screenBase64)
+                    try {
+                        tickCharacterAi(overlay, cameraBase64, screenBase64)
+                    } catch (e: Throwable) {
+                        CrashReporter.report(this@OverlayService, "tick AI ${overlay.def.id}", e)
+                    }
                 }
                 delay(TICK_INTERVAL_MS)
             }
@@ -206,17 +224,21 @@ class OverlayService : LifecycleService() {
         serviceScope.launch {
             while (true) {
                 delay(SURVIVAL_POLL_MS)
-                if (!Prefs.survivalEnabled(this@OverlayService)) continue
-                for ((characterId, overlay) in overlays) {
-                    if (overlay.state.dead) continue
-                    val s = Prefs.survival(this@OverlayService, characterId) ?: continue
-                    val hunger = (s.hunger - HUNGER_PER_POLL).coerceAtLeast(0f)
-                    val thirst = (s.thirst - THIRST_PER_POLL).coerceAtLeast(0f)
-                    val hp = (s.hp - if (hunger <= 0f || thirst <= 0f) HP_LOSS_PER_POLL_STARVED else 0f).coerceAtLeast(0f)
-                    Prefs.setSurvivalStat(this@OverlayService, characterId, hp = hp, hunger = hunger, thirst = thirst, dead = hp <= 0f)
-                    if (hp <= 0f) {
-                        mainHandler.post { overlay.state.kill() }
+                try {
+                    if (!Prefs.survivalEnabled(this@OverlayService)) continue
+                    for ((characterId, overlay) in overlays) {
+                        if (overlay.state.dead) continue
+                        val s = Prefs.survival(this@OverlayService, characterId) ?: continue
+                        val hunger = (s.hunger - HUNGER_PER_POLL).coerceAtLeast(0f)
+                        val thirst = (s.thirst - THIRST_PER_POLL).coerceAtLeast(0f)
+                        val hp = (s.hp - if (hunger <= 0f || thirst <= 0f) HP_LOSS_PER_POLL_STARVED else 0f).coerceAtLeast(0f)
+                        Prefs.setSurvivalStat(this@OverlayService, characterId, hp = hp, hunger = hunger, thirst = thirst, dead = hp <= 0f)
+                        if (hp <= 0f) {
+                            mainHandler.post { overlay.state.kill() }
+                        }
                     }
+                } catch (e: Throwable) {
+                    CrashReporter.report(this@OverlayService, "survival drain", e)
                 }
             }
         }
