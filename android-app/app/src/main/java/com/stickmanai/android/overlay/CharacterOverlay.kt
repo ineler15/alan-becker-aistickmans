@@ -11,6 +11,7 @@ import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.TextView
 import com.stickmanai.android.CharacterDef
+import com.stickmanai.android.BuildConfig
 import com.stickmanai.android.CrashReporter
 import com.stickmanai.android.Prefs
 import com.stickmanai.android.input.TapAccessibilityService
@@ -36,13 +37,39 @@ class CharacterOverlay(
         private const val PINCH_OFFSET_RATIO = 120f / 128f
         private const val TAP_MAX_MOVE_PX = 20
         private const val TAP_MAX_MS = 250L
+        // Slam-into-edge damage: releasing a dragged character pinned against any screen edge
+        // (left/right wall, ceiling, or slammed onto the floor) costs hp, like a fight hit.
+        private const val EDGE_SLAM_MARGIN_DP = 8
+        private const val SLAM_DAMAGE = 10
     }
 
-    // If there's a rigs/<id>.json asset, render bones procedurally via RigView instead of the
-    // raster SpriteSet - see sn_proto_wasm_renderer memory. Only "Red" has one for now; every
-    // other character keeps using sprites untouched.
-    private val rigFigure = RigFigure.forCharacterOrNull(context, def.id)
-    private val sprites = if (rigFigure == null) SpriteSet.forCharacter(context, def.id) else null
+    // Which renderer to use. Modern (rigs) prefers the procedural rig and falls back to sprites.
+    // Legacy (sprites, RENDER_MODE=sprites like the desktop's legacy build) does the opposite:
+    // sprites first, rig only for characters that have no sprite art (custom characters get a
+    // generated rig but never sprite PNGs).
+    private class RenderChoice(val rig: RigFigure?, val sprites: SpriteSet?) {
+        companion object {
+            fun pick(context: Context, id: String): RenderChoice {
+                val forceSprites = BuildConfig.RENDER_MODE == "sprites"
+                val rig = RigFigure.forCharacterOrNull(context, id)
+                if (forceSprites) {
+                    return try {
+                        RenderChoice(null, SpriteSet.forCharacter(context, id))
+                    } catch (e: Exception) {
+                        RenderChoice(rig, null)
+                    }
+                }
+                return if (rig != null) {
+                    RenderChoice(rig, null)
+                } else {
+                    RenderChoice(null, try { SpriteSet.forCharacter(context, id) } catch (e: Exception) { null })
+                }
+            }
+        }
+    }
+    private val renderChoice = RenderChoice.pick(context, def.id)
+    private val rigFigure = renderChoice.rig
+    private val sprites = renderChoice.sprites
     // Tints TouchPointerOverlay's dot so with several characters able to tap (see
     // Prefs.allowScreenControl), it's visually clear which one is doing it right now.
     val pointerColor: Int get() = rigFigure?.bodyColor ?: Color.WHITE
@@ -155,13 +182,36 @@ class CharacterOverlay(
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 val movedPx = kotlin.math.hypot((event.rawX - downRawX).toDouble(), (event.rawY - downRawY).toDouble())
                 val heldMs = System.currentTimeMillis() - downAt
-                if (state.beingDragged) state.onRelease()
+                if (state.beingDragged) {
+                    // Only an actual drag (past the tap threshold) counts - a plain tap on a
+                    // resting character shouldn't deal floor-slam damage.
+                    val hadSlam = movedPx > TAP_MAX_MOVE_PX &&
+                        Prefs.survivalEnabled(context) && !state.dead && isEdgeSlam()
+                    state.onRelease()
+                    if (hadSlam) {
+                        Prefs.applyDamage(context, def.id, SLAM_DAMAGE.toFloat())
+                        val after = Prefs.survival(context, def.id)!!
+                        state.say("¡Auch! ($SLAM_DAMAGE de daño)")
+                        state.setFace("wide", "open")
+                        if (after.dead) state.kill()
+                    }
+                }
                 if (movedPx <= TAP_MAX_MOVE_PX && heldMs <= TAP_MAX_MS) {
                     onTap(def.id)
                 }
             }
         }
         return true
+    }
+
+    // Released while pinned against an edge? dragTo() clamps x to [0, screenWidthPx] and y to
+    // [0, floorY], so slamming against any extreme leaves the anchor near one of them.
+    private fun isEdgeSlam(): Boolean {
+        val margin = (EDGE_SLAM_MARGIN_DP * density).toInt()
+        return state.x <= margin ||
+            state.x >= screenWidthPx - margin ||
+            state.y <= margin ||
+            state.y >= floorY - margin
     }
 
     /** Runs one physics tick and repositions/re-renders both overlay windows. Call every ~40ms on the main thread. */

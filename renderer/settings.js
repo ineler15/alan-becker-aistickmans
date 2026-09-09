@@ -21,6 +21,7 @@ let checkboxes = {};
 let partnerSelects = {};
 let affectionInputs = {};
 let contextInputs = {};
+let contextModeSelects = {};
 let editingContextId = null;
 
 async function renderCharacterList(providers) {
@@ -33,11 +34,13 @@ async function renderCharacterList(providers) {
   partnerSelects = {};
   affectionInputs = {};
   contextInputs = {};
+  contextModeSelects = {};
   const enabledIds = new Set(settings.enabledIds || []);
   const perCharacterProvider = settings.perCharacterProvider || {};
   const perCharacterPartner = settings.perCharacterPartner || {};
   const perCharacterAffection = settings.perCharacterAffection || {};
   const perCharacterContext = settings.perCharacterContext || {};
+  const perCharacterContextMode = settings.perCharacterContextMode || {};
   for (const c of characters) {
     const row = document.createElement('div');
     row.className = 'char-row';
@@ -128,6 +131,23 @@ async function renderCharacterList(providers) {
       row.appendChild(editBtn);
     }
 
+    const contextModeSelect = document.createElement('select');
+    const modeOpts = [
+      ['canon', 'Alan Becker (canon)'],
+      ['user', 'Creado por vos'],
+      ['ia', 'IA al iniciar'],
+    ];
+    for (const [value, text] of modeOpts) {
+      const opt = document.createElement('option');
+      opt.value = value;
+      opt.textContent = text;
+      contextModeSelect.appendChild(opt);
+    }
+    contextModeSelect.value = perCharacterContextMode[c.id] || 'canon';
+    contextModeSelect.title = 'Qué trasfondo usa este personaje (Al Becker, tu texto, o uno generado al arrancar)';
+    contextModeSelects[c.id] = contextModeSelect;
+    row.appendChild(contextModeSelect);
+
     const contextBtn = document.createElement('button');
     contextBtn.textContent = 'Contexto';
     contextBtn.type = 'button';
@@ -203,6 +223,8 @@ async function init() {
     for (const id in contextInputs) {
       if (contextInputs[id]) perCharacterContextOut[id] = contextInputs[id];
     }
+    const perCharacterContextModeOut = {};
+    for (const id in contextModeSelects) perCharacterContextModeOut[id] = contextModeSelects[id].value;
     const enabled = Object.keys(checkboxes).filter((id) => checkboxes[id].checked);
     window.stickmanAPI.savePcSettings({
       provider: providerSelect.value,
@@ -212,6 +234,7 @@ async function init() {
       perCharacterPartner: perCharacterPartnerOut,
       perCharacterAffection: perCharacterAffectionOut,
       perCharacterContext: perCharacterContextOut,
+      perCharacterContextMode: perCharacterContextModeOut,
       enabledIds: enabled,
       allowMouseControl: document.getElementById('allowMouseControl').checked,
       survivalEnabled: document.getElementById('survivalEnabled').checked,

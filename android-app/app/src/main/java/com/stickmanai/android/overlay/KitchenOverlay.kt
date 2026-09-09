@@ -5,17 +5,15 @@ import android.graphics.PixelFormat
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
-import android.view.View
 import android.view.WindowManager
+import android.widget.ImageView
 import com.stickmanai.android.CrashReporter
-import kotlin.random.Random
 
 /**
- * The kitchen prop: a small static window (18% of the screen width, bottom-anchored like the
- * desktop's kitchen window) holding a RigView with one of the kitchen background stations - the
- * same rigs character.js cycles on PC (kitchen -> kitchen-1 -> kitchen-2). OverlayService drives
- * charThe station swap (nextStation(), fading between them) so the kitchen "comes alive" without
- * any AI involvement.
+ * The kitchen prop: a small static window (18% of the screen width, bottom-right anchored like the
+ * desktop's kitchen window) showing the user's kitchen photo (assets/kitchen/kitchen.webp) instead
+ * of the rig backgrounds PC used to cycle. nextStation() stays for API compatibility with
+ * OverlayService's playEat/playDrink but does nothing - a single photo has no stations.
  */
 class KitchenOverlay(
     private val context: Context,
@@ -23,14 +21,24 @@ class KitchenOverlay(
     private val screenWidthPx: Int,
 ) {
     private val density = context.resources.displayMetrics.density
-    // Each station's side length: the biggest dimension of any station rig's rest bounds,
-    // auto-scaled by RigView's pivot-fit anyway, so a single square size works for all three.
     private val sizePx = (screenWidthPx * 0.18f).toInt()
-    private val stationIds = listOf("kitchen", "kitchen-1", "kitchen-2")
-    private var stationIndex = Random.nextInt(stationIds.size)
 
-    // The kitchen rigs ship in assets/rigs/ - if one is ever missing, the whole overlay is a no-op.
-    private val rigView: RigView? = RigFigure.forCharacterOrNull(context, stationIds[stationIndex])?.let { RigView(context, it) }
+    private val imageView: ImageView? = run {
+        try {
+            context.assets.open("kitchen/kitchen.webp").use { stream ->
+                android.graphics.BitmapFactory.decodeStream(stream)?.let { bitmap ->
+                    ImageView(context).apply {
+                        setImageBitmap(bitmap)
+                        scaleType = ImageView.ScaleType.FIT_CENTER
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            // Missing/corrupt asset - the whole overlay is a no-op, same as a missing kitchen rig.
+            CrashReporter.report(context, "cocina: cargar foto", e)
+            null
+        }
+    }
 
     private val params = WindowManager.LayoutParams(
         sizePx, sizePx,
@@ -45,39 +53,20 @@ class KitchenOverlay(
 
     private val handler = Handler(Looper.getMainLooper())
 
-    private val fadeOut = object : Runnable {
-        override fun run() {
-            val view = rigView ?: return
-            // Fade old station out, swap in the new one at full alpha, fade back in.
-            try {
-                view.animate().alpha(0f).setDuration(500).withEndAction {
-                    stationIndex = (stationIndex + 1) % stationIds.size
-                    val next = RigFigure.forCharacterOrNull(context, stationIds[stationIndex]) ?: return@withEndAction
-                    view.setFigure(next)
-                    view.alpha = 0f
-                    view.animate().alpha(1f).setDuration(500).start()
-                }.start()
-            } catch (e: Throwable) {
-                CrashReporter.report(context, "cocina: cambiar estacion", e)
-            }
-        }
-    }
-
     fun attach() {
-        rigView?.let { windowManager.addView(it, params); it.alpha = 1f }
+        imageView?.let { windowManager.addView(it, params) }
     }
 
-    fun nextStation() {
-        handler.post(fadeOut)
-    }
+    // Kept for API compatibility; the single-photo kitchen has no stations to fade between.
+    fun nextStation() {}
 
     // Center of the kitchen window in screen px - eat/drink range checks and the food-prop slide
-    // origin both use this (OverlayService). Null when no kitchen rig is on screen.
+    // origin both use this (OverlayService). Null when no kitchen photo is on screen.
     fun getPosition(): Pair<Int, Int>? =
-        rigView?.let { Pair(params.x + sizePx / 2, params.y + sizePx / 2) }
+        imageView?.let { Pair(params.x + sizePx / 2, params.y + sizePx / 2) }
 
     fun detach() {
-        handler.removeCallbacks(fadeOut)
-        rigView?.let { it.animate().cancel(); try { windowManager.removeView(it) } catch (e: Exception) { /* already gone */ } }
+        handler.removeCallbacksAndMessages(null)
+        imageView?.let { try { windowManager.removeView(it) } catch (e: Exception) { /* already gone */ } }
     }
 }

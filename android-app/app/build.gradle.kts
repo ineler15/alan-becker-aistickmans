@@ -11,8 +11,24 @@ android {
         applicationId = "com.stickmanai.android"
         minSdk = 26
         targetSdk = 36
-        versionCode = 23
-        versionName = "1.20.0"
+        versionCode = 24
+        versionName = "1.21.0"
+    }
+
+    // "modern" = rigs renderer (default); "legacy" = sprite-PNG renderer like the desktop's legacy
+    // build (rc renderMode=sprites) - separate applicationId so both can be installed side by side.
+    flavorDimensions += "mode"
+    productFlavors {
+        create("modern") {
+            dimension = "mode"
+            applicationId = "com.stickmanai.android"
+            buildConfigField("String", "RENDER_MODE", "\"rigs\"")
+        }
+        create("legacy") {
+            dimension = "mode"
+            applicationId = "com.stickmanai.android.legacy"
+            buildConfigField("String", "RENDER_MODE", "\"sprites\"")
+        }
     }
 
     buildTypes {
@@ -30,6 +46,7 @@ android {
     }
     buildFeatures {
         viewBinding = true
+        buildConfig = true
     }
 }
 

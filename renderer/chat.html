@@ -15,6 +15,23 @@
         box-sizing: border-box;
         padding: 12px;
         gap: 8px;
+        position: relative;
+      }
+      /* Shown only in the legacy (sprite) build - chat.js flips this on when
+         ?legacy=1 is in the window's query params (main.js adds it). */
+      #legacyTag {
+        display: none;
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        background: #b45309;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 10px;
+        letter-spacing: 1px;
+        user-select: none;
       }
       select {
         background: #2a2a2a;
@@ -57,6 +74,7 @@
     </style>
   </head>
   <body>
+    <div id="legacyTag">LEGACY</div>
     <select id="target"></select>
     <textarea id="message" placeholder="Escribile algo... (Enter para enviar)" autofocus></textarea>
     <button id="send">Enviar</button>

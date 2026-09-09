@@ -1,0 +1,31 @@
+appId: com.stickmanai.desktop.legacy
+productName: Alan Becker AIStickmans (Legacy)
+icon: build/icons/legacy-icon.png
+# Baked into the packaged package.json - src/config.js's renderMode getter reads it and switches
+# every character window to sprite rendering (?renderMode=sprites). Modern build (npm run dist)
+# has no renderMode here, so it stays on the default 'rigs'.
+extraMetadata:
+  # package.json 'name' drives app.getPath('userData') - a separate one keeps the legacy's
+  # workspace/history/memory files out of the modern app's folder so both can run without
+  # racing on the same JSON files. renderMode is what switches every window to sprites.
+  name: stickman-ia-legacy
+  renderMode: sprites
+  peerPort: 8788
+  version: 1.0.0-beta
+files:
+  - main.js
+  - preload.js
+  - package.json
+  - dist/**/*
+  - src/**/*
+  - renderer/**/*
+  - node_modules/**/*
+directories:
+  output: release-legacy
+npmRebuild: false
+win:
+  target: nsis
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true

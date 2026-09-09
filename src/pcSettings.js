@@ -32,6 +32,10 @@ function load() {
       // the settings window) - injected into the AI prompt SEPARATE from the automatic context
       // (history/peers/status/etc.). Same map shape as perCharacterPartner: id -> text.
       perCharacterContext: {},
+      // Which backstory source each character uses: 'canon' (default - the built-in Alan Becker
+      // lore), 'user' (the perCharacterContext text above) or 'ia' (a paragraph generated at app
+      // start into src/memory/aiContext.js). Map: id -> mode.
+      perCharacterContextMode: {},
       // No settings file yet (first run) - default to the same subset that used to be
       // hardcoded in characters.js, so behavior is unchanged until the user touches a checkbox.
       enabledIds: CHARACTERS.map((c) => c.id),
@@ -83,6 +87,18 @@ function applyPartners(settings) {
 function applyContexts(settings) {
   for (const character of CHARACTERS.ALL) {
     character.userContext = ((settings.perCharacterContext || {})[character.id] || '').trim();
+  }
+}
+
+// Stamps each character's backstory MODE onto its CHARACTERS.ALL entry, same pattern as
+// applyContexts - agentLoop.js reads character.contextMode to pick which backstory source feeds
+// the prompt: 'canon' (built-in Alan Becker lore), 'user' (perCharacterContext text from the
+// "Contexto" button) or 'ia' (a paragraph generated at app start). Anything else falls back to
+// the default 'canon'.
+function applyContextModes(settings) {
+  for (const character of CHARACTERS.ALL) {
+    const mode = ((settings.perCharacterContextMode || {})[character.id] || 'canon');
+    character.contextMode = mode === 'user' || mode === 'ia' ? mode : 'canon';
   }
 }
 
@@ -139,5 +155,6 @@ module.exports = {
   applyEnabledCharacters,
   applyPartners,
   applyContexts,
+  applyContextModes,
   SETTINGS_PATH,
 };

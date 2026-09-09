@@ -130,6 +130,46 @@ const config = {
     const v = process.env.ATTENTION_FOCUS;
     return v === 'mouse' || v === 'screen' || v === 'all' ? v : 'camera';
   },
+  // 'rigs' (the modern .nodes-model rendering) vs 'sprites' (the legacy Shimeji-style sprite
+  // rendering, renderer/sprites/). The legacy build bakes it in via electron-builder's
+  // extraMetadata { renderMode: "sprites" } into the packaged package.json; dev/npm start can
+  // also force it with env RENDER_MODE=sprites. Defaults to the modern rigs rendering.
+  get renderMode() {
+    const fromEnv = process.env.RENDER_MODE;
+    if (fromEnv === 'sprites' || fromEnv === 'rigs') return fromEnv;
+    try {
+      const pkg = require(path.join(ROOT_DIR, 'package.json'));
+      if (pkg.renderMode === 'sprites') return 'sprites';
+    } catch (e) {
+      // ignore - fall through to the default below
+    }
+    return 'rigs';
+  },
+  get isSpritesMode() {
+    return this.renderMode === 'sprites';
+  },
+  // Puerto HTTP del peerServer de esta instancia (src/net/peerServer.js). Primero manda el env
+  // PEER_PORT, luego el campo peerPort del package.json empaquetado (solo el build legacy lo
+  // hornea como 8788 via electron-builder's extraMetadata; el moderno se queda en el default
+  // 8787). Misiva el patron del getter renderMode de arriba: require en try/catch e ignorado.
+  get peerPort() {
+    const fromEnv = Number(process.env.PEER_PORT || 0);
+    if (fromEnv) return fromEnv;
+    try {
+      const pkg = require(path.join(ROOT_DIR, 'package.json'));
+      const fromPkg = Number(pkg.peerPort);
+      if (fromPkg > 0) return fromPkg;
+    } catch (e) {
+      // ignore - cae al default de abajo
+    }
+    return 8787;
+  },
+  // Puerto de la OTRA instancia de escritorio (la que vive en el escritorio lado a lado). Cada
+  // instancia habla con la contraria: la moderna (8787) sincroniza con la legacy (8788) y
+  // viceversa. El env PEER_REMOTE_PORT puede forzarlo manualmente si hiciera falta.
+  get peerRemotePort() {
+    return Number(process.env.PEER_REMOTE_PORT || 0) || (this.peerPort === 8787 ? 8788 : 8787);
+  },
   // Survival system (vida/hambre/sed): stat bars over each character, slow hunger/thirst drain,
   // eat/drink only at the kitchen, fight-induced damage, and death (manual revive from the chat).
   // Toggleable in Configuracion - when off, stats stay full, nobody fights, nobody dies. Default

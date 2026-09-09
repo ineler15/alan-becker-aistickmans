@@ -110,7 +110,7 @@ function openChatWindow(defaultCharacterId) {
   chatWindow = new BrowserWindow({
     width: 360,
     height: 240,
-    title: 'Hablar con el stickman',
+    title: config.isSpritesMode ? 'Hablar con el stickman (LEGACY)' : 'Hablar con el stickman',
     autoHideMenuBar: true,
     alwaysOnTop: true,
     webPreferences: {
@@ -119,7 +119,11 @@ function openChatWindow(defaultCharacterId) {
       nodeIntegration: false,
     },
   });
-  chatWindow.loadFile(path.join(__dirname, 'renderer', 'chat.html'));
+  chatWindow.loadFile(path.join(__dirname, 'renderer', 'chat.html'), {
+    // Lets the renderer show a LEGACY badge when this build is the sprite variant, so it's
+    // obvious which instance the chat belongs to (legacy + modern share the chat UI file).
+    query: { legacy: config.isSpritesMode ? '1' : '' },
+  });
   chatWindow.once('ready-to-show', () => bringToFront(chatWindow));
   chatWindow.on('closed', () => {
     chatWindow = null;
@@ -292,6 +296,7 @@ app.whenReady().then(() => {
     pcSettings.applyEnabledCharacters(settings);
     pcSettings.applyPartners(settings);
     pcSettings.applyContexts(settings);
+    pcSettings.applyContextModes(settings);
     if (settingsWindow) settingsWindow.close();
     startCharacterEngine();
     agentLoop.start();

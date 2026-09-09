@@ -68,6 +68,9 @@ class OverlayService : LifecycleService() {
         const val HUNGER_PER_POLL = 0.5f
         const val THIRST_PER_POLL = 0.75f
         const val HP_LOSS_PER_POLL_STARVED = 1.5f
+        // Cooldown between on-character "API key agotada" warnings while the provider keeps
+        // failing per tick - same reasoning as desktop agentLoop.js's API_KEY_WARN_COOLDOWN_MS.
+        const val API_KEY_WARN_COOLDOWN_MS = 120_000L
         // Action-range checks mirror executor.js on PC.
         const val FIGHT_DISTANCE_PX = 100
         const val KITCHEN_DISTANCE_PX = 150
@@ -80,6 +83,7 @@ class OverlayService : LifecycleService() {
     private val pcGhosts = HashMap<String, GhostOverlay>()
     private var pcPeersCache: PcPeersResult = PcPeersResult(0, emptyList())
     private val turnsSinceSay = HashMap<String, Int>()
+    private val apiKeyWarnedAtById = HashMap<String, Long>()
     // Lives only while the survival system is on and the kitchen rigs are present - see setupOverlays().
     private var kitchenOverlay: KitchenOverlay? = null
     // Cycles through FoodPropOverlay.FOOD_CANDIDATES so consecutive meals visibly switch foods.
@@ -384,6 +388,21 @@ class OverlayService : LifecycleService() {
             // Put the chat message back so it isn't silently lost on a transient network error -
             // it already got consumed above before we knew the call would fail.
             if (userMessage != null) PendingMessages.set(characterId, userMessage)
+            // API-key/quota exhaustion: show the warning on the character once (cooldown) instead
+            // of everything silently failing forever. The bubble expires on its own (sayUntil).
+            val msg = e.message ?: ""
+            if (msg.contains("quota", true) || msg.contains("429") || msg.contains("rate_limit", true) ||
+                msg.contains("resource_exhausted", true) || msg.contains("401", true) ||
+                msg.contains("invalid api key", true) || msg.contains("402", true) || msg.contains("billing", true)
+            ) {
+                val nowMs = System.currentTimeMillis()
+                if (nowMs - (apiKeyWarnedAtById[characterId] ?: 0L) > API_KEY_WARN_COOLDOWN_MS) {
+                    apiKeyWarnedAtById[characterId] = nowMs
+                    mainHandler.post {
+                        overlay.state.say("¡Uy! Parece que la API key se agotó o no es válida. Avisale a mi humano.")
+                    }
+                }
+            }
             // Used to fall back to a random walk target here, but a burst of failed decide()
             // calls (e.g. the screenshot crash-loop) made that look like the character going
             // haywire, constantly re-randomizing its target every tick. Only the AI's own

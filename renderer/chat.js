@@ -4,6 +4,12 @@ const button = document.getElementById('send');
 const giveSnackButton = document.getElementById('giveSnack');
 const reviveButton = document.getElementById('reviveBtn');
 
+// main.js loads this window with ?legacy=1 for the sprite (legacy) build so the chat clearly
+// shows which instance it belongs to when legacy and modern run side by side.
+if (new URLSearchParams(location.search).get('legacy') === '1') {
+  document.getElementById('legacyTag').style.display = 'block';
+}
+
 async function init() {
   const { characters, defaultCharacterId } = await window.stickmanAPI.getCharacters();
   select.innerHTML = '';

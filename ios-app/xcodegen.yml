@@ -1,0 +1,27 @@
+# Genera el proyecto Xcode con: xcodegen generate  (instalar antes: brew install xcodegen)
+# Luego abrir StickmanAI.xcodeproj en Xcode (13+ / iOS 16+) y correr en simulador o dispositivo.
+name: StickmanAI
+options:
+  bundleIdPrefix: com.stickmanai
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: 5.9
+    MARKETING_VERSION: 1.0.0
+    CURRENT_PROJECT_VERSION: 1
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+targets:
+  StickmanAI:
+    type: application
+    platform: iOS
+    sources:
+      - StickmanAI
+    info:
+      path: StickmanAI/Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.stickmanai.ios
+        INFOPLIST_FILE: StickmanAI/Info.plist
+        TARGETED_DEVICE_FAMILY: "1,2"

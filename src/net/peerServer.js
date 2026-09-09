@@ -12,7 +12,7 @@ const health = require('../loop/health');
 // other's characters - same lightweight visibility (position + last thing said) that characters
 // on one device already have of each other, just carried over the LAN. Personality/memory stay
 // separate per device on purpose - this is not a shared brain.
-const PORT = 8787;
+const PORT = config.peerPort;
 const REMOTE_STALE_MS = 30000;
 const REMOTE_PEERS_FILE = path.join(config.workspaceDir, 'remote-peers.json');
 const IMG_DIR = path.join(path.dirname(config.shimeji.jarPath), 'img');
@@ -148,6 +148,55 @@ function start() {
     console.warn('[peerServer] no se pudo iniciar:', err.message);
   });
   server.listen(PORT, '0.0.0.0');
+
+  // Lado cliente: cada instancia de escritorio tambien le habla al peerServer de la OTRA
+  // instancia (la legacy en 8788 y la moderna en 8787) para que los stickmen de ambas apps se
+  // vean entre si como si compartieran pantalla. Simetrico: ambas son servidor y cliente a la
+  // vez. Solo tiene sentido cuando los puertos difieren (no hay nada que sincronizar contra uno
+  // mismo).
+  const remotePort = config.peerRemotePort;
+  if (remotePort !== config.peerPort) {
+    let announced = false;
+    const syncWithRemote = () => {
+      try {
+        const width = screen.getPrimaryDisplay().size.width;
+        // (a) Posteamos nuestros peers a la otra instancia por su misma ruta /peers - pasa por
+        // el handler POST normal (guarda remote-peers.json del otro lado, igual que Android).
+        fetch('http://127.0.0.1:' + remotePort + '/peers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ screenWidth: width, peers: localPeersPayload() }),
+        }).catch(() => {});
+        // (b) Traemos los peers de la otra instancia. Al guardarlos en remotePeers se
+        // normaliza cualquier device:'pc' a undefined (se omiten) para que al AI le lean como
+        // stickmen del mismo escritorio, caminables, no como tablets remotas; los 'tablet' se
+        // respetan tal cual. Esta data NO se escribe a remote-peers.json (ese archivo solo lo
+        // escribe el lado que RECIBE un POST, o sea cuando un dispositivo nos reporta).
+        fetch('http://127.0.0.1:' + remotePort + '/peers')
+          .then((r) => r.json())
+          .then((data) => {
+            if (data && Array.isArray(data.peers)) {
+              remotePeers = data.peers.map((p) =>
+                p && p.device === 'pc' ? { ...p, device: undefined } : p
+              );
+              remoteReceivedAt = Date.now();
+              remoteScreenWidth = data.screenWidth || 0;
+              if (!announced) {
+                announced = true;
+                console.log('[peerServer] sincronizando con instancia en', remotePort);
+              }
+            }
+          })
+          .catch(() => {});
+      } catch (e) {
+        // La otra instancia puede no estar corriendo: un fetch fallido nunca debe crashear ni
+        // hacer spam en los logs.
+      }
+    };
+    // Dispara la primera sincronizacion de inmediato y luego cada 4000 ms.
+    syncWithRemote();
+    setInterval(syncWithRemote, 4000);
+  }
 }
 
 module.exports = { start, getRemotePeers };

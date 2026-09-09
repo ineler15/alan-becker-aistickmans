@@ -34,11 +34,18 @@ const survival = require('../memory/survival');
 // character.html's #speech positioning.
 const RIG_WIDTH = 80;
 const RIG_HEIGHT = 105;
+// Legacy (sprite) build renders these ~1.75x bigger - the user found the sprite characters too
+// small at the rig's tiny 80x105 box, then too big at the first 200x260 attempt. At 140x184 the
+// 128x128 PNGs render near native size (~126px) with no upscale blur.
+const SPRITE_RIG_WIDTH = 140;
+const SPRITE_RIG_HEIGHT = 184;
 const BUBBLE_SIDE_MARGIN = 60;
 const BUBBLE_TOP_MARGIN = 50;
-const WINDOW_WIDTH = RIG_WIDTH + BUBBLE_SIDE_MARGIN * 2;
-const WINDOW_HEIGHT = RIG_HEIGHT + BUBBLE_TOP_MARGIN;
 const DRAG_END_QUIET_MS = 150;
+// Slam-into-edge damage: releasing a dragged character pinned against any screen edge (left/right
+// wall, ceiling, or slammed onto the floor) costs it hp from the survival system, like a fight hit.
+const EDGE_SLAM_MARGIN = 16;
+const SLAM_DAMAGE = 10;
 
 // Survival drain cadence (only when config.survivalEnabled): every poll the character gets
 // hungrier/thirstier by a fraction, and once either reaches 0 it starts losing hp instead. Rates
@@ -52,13 +59,28 @@ const HP_LOSS_PER_POLL_STARVED = 1.5;
 let entries = [];
 let tickTimer = null;
 
+// Released while pinned hard against an edge? Uses the character's clamped drag position: on PC
+// dragTo() clamps x to [0, screenWidth] and y to [0, floorY], so a slam against any extreme ends
+// up within EDGE_SLAM_MARGIN of one of them.
+function isEdgeSlam(state) {
+  return (
+    state.x <= EDGE_SLAM_MARGIN ||
+    state.x >= state.screenWidth - EDGE_SLAM_MARGIN ||
+    state.y <= EDGE_SLAM_MARGIN ||
+    state.y >= state.floorY - EDGE_SLAM_MARGIN
+  );
+}
+
 function windowSize() {
   const scaleFactor = screen.getPrimaryDisplay().scaleFactor || 1;
+  const sprite = config.isSpritesMode;
+  const rigWidth = sprite ? SPRITE_RIG_WIDTH : RIG_WIDTH;
+  const rigHeight = sprite ? SPRITE_RIG_HEIGHT : RIG_HEIGHT;
   return {
-    width: Math.round(WINDOW_WIDTH / scaleFactor),
-    height: Math.round(WINDOW_HEIGHT / scaleFactor),
-    rigWidth: Math.round(RIG_WIDTH / scaleFactor),
-    rigHeight: Math.round(RIG_HEIGHT / scaleFactor),
+    width: Math.round((rigWidth + BUBBLE_SIDE_MARGIN * 2) / scaleFactor),
+    height: Math.round((rigHeight + BUBBLE_TOP_MARGIN) / scaleFactor),
+    rigWidth: Math.round(rigWidth / scaleFactor),
+    rigHeight: Math.round(rigHeight / scaleFactor),
   };
 }
 
@@ -80,7 +102,14 @@ function createWindow(character, startX, startY, size) {
     },
   });
   const builtinRigPath = path.join(__dirname, '..', '..', 'renderer', 'rigs', `${character.id}.json`);
-  const query = { id: character.id, rw: String(size.rigWidth), rh: String(size.rigHeight) };
+  const query = {
+    id: character.id,
+    rw: String(size.rigWidth),
+    rh: String(size.rigHeight),
+    // 'rigs' (modern, .nodes models) or 'sprites' (legacy, Shimeji-style PNGs) - character.js
+    // switches rendering mode on this. Prop windows (food/kitchen) never get it and stay rigs.
+    renderMode: config.renderMode,
+  };
   // Custom characters' rigs live in the writable workspace dir (see customCharacters.js), not
   // under renderer/rigs/ - that tree can end up read-only inside app.asar in a packaged build.
   if (!fs.existsSync(builtinRigPath)) {
@@ -137,7 +166,17 @@ function start(characters) {
       );
       if (entry.dragEndTimer) clearTimeout(entry.dragEndTimer);
       entry.dragEndTimer = setTimeout(() => {
-        if (state.beingDragged) state.onRelease();
+        if (state.beingDragged) {
+          const hadSlam = config.survivalEnabled && !state.dead && isEdgeSlam(state);
+          state.onRelease();
+          if (hadSlam) {
+            survival.applyDamage(entry.id, SLAM_DAMAGE);
+            const after = survival.get(entry.id);
+            state.say(`¡Auch! (${SLAM_DAMAGE} de daño)`);
+            state.setFace('wide', 'open');
+            if (after.dead) state.kill();
+          }
+        }
       }, DRAG_END_QUIET_MS);
     });
 

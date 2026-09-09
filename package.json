@@ -1,13 +1,15 @@
 {
   "name": "stickman-ia",
-  "version": "2.21.0",
+  "version": "2.22.0",
   "description": "Stickman de escritorio con IA real que puede manipular la PC (estilo Alan Becker)",
   "main": "main.js",
   "private": true,
   "scripts": {
     "build": "tsc",
     "start": "npm run build && electron .",
-    "dist": "npm run build && electron-builder --win nsis"
+    "dist": "npm run build && electron-builder --win nsis",
+    "dist-legacy": "npm run build && electron-builder --win nsis --config=build/electron-builder-legacy.yml",
+    "gen-icons": "node scripts/gen-icons.js"
   },
   "build": {
     "npmRebuild": false,

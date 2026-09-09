@@ -35,6 +35,14 @@ let foodBitesLeft = foodBitesTotal;
 let foodJiggleRad = 0;
 let drinkTiltDeg = 0;
 
+// Legacy sprite rendering mode: jsCharacterEngine sets ?renderMode=sprites when this window's
+// app build is the sprite (legacy) variant, so poses draw from renderer/sprites/<id>/ PNGs
+// instead of the rig (mirrors Android's SpriteSet path). Custom characters have no sprites, so
+// they report not-ready and this window falls back to rig rendering for them.
+const spriteModeRequested = params.get('renderMode') === 'sprites';
+let spriteSet = null;
+let currentSprite = null;
+
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 const speechEl = document.getElementById('speech');
@@ -419,8 +427,74 @@ function draw() {
   }
 }
 
+function drawSprite() {
+  if (!currentSprite) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const pad = canvas.width * 0.05;
+  const scale = Math.min(
+    (canvas.width - pad * 2) / Math.max(currentSprite.width, 1),
+    (canvas.height - pad * 2) / Math.max(currentSprite.height, 1)
+  );
+  const dw = currentSprite.width * scale;
+  const dh = currentSprite.height * scale;
+  ctx.drawImage(currentSprite, (canvas.width - dw) / 2, (canvas.height - dh) / 2, dw, dh);
+  if (dead) {
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const r = Math.min(canvas.width, canvas.height) * 0.35;
+    ctx.strokeStyle = 'rgba(255, 40, 40, 0.95)';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx - r, cy - r);
+    ctx.lineTo(cx + r, cy + r);
+    ctx.moveTo(cx + r, cy - r);
+    ctx.lineTo(cx - r, cy + r);
+    ctx.stroke();
+  }
+  if (lastStats) {
+    const bars = [
+      { label: 'vida', value: lastStats.hp, color: '#e53935' },
+      { label: 'hambre', value: lastStats.hunger, color: '#fb8c00' },
+      { label: 'sed', value: lastStats.thirst, color: '#1e88e5' },
+    ];
+    const barW = 20;
+    const barH = 4;
+    const gap = 3;
+    const totalW = bars.length * barW + (bars.length - 1) * gap;
+    let bx = canvas.width / 2 - totalW / 2;
+    const by = 4;
+    ctx.textAlign = 'center';
+    for (const bar of bars) {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+      ctx.fillRect(bx, by, barW, barH);
+      ctx.fillStyle = bar.color;
+      ctx.fillRect(bx, by, Math.max(barH, (Math.min(100, Math.max(0, bar.value)) / 100) * barW), barH);
+      ctx.fillStyle = '#fff';
+      ctx.font = '7px system-ui, sans-serif';
+      ctx.fillText(bar.label, bx + barW / 2, by + barH + 7);
+      bx += barW + gap;
+    }
+  }
+}
+
 ipcRenderer.on('character:pose', (_event, payload) => {
   if (payload.id !== characterId) return;
+  if (spriteSet && spriteSet.ready) {
+    currentSprite = spriteSet.frameFor(payload.descriptor.kind, payload.descriptor.frame);
+    if (payload.lookRight !== undefined) lookRight = payload.lookRight;
+    lastStats = payload.stats || null;
+    if (payload.dead !== undefined) dead = payload.dead;
+    canvas.style.transform = lookRight ? 'scaleX(-1)' : 'none';
+    if (payload.speechText) {
+      speechEl.textContent = payload.speechText;
+      speechEl.style.display = 'block';
+    } else {
+      speechEl.style.display = 'none';
+    }
+    drawSprite();
+    return;
+  }
   currentPose = window.PoseLibrary.forDescriptor(payload.descriptor, poseId);
   if (payload.eyeStyle) currentEyeStyle = payload.eyeStyle;
   if (payload.mouthStyle) currentMouthStyle = payload.mouthStyle;
@@ -441,7 +515,8 @@ function resizeCanvas() {
   canvas.width = rigWidth;
   canvas.height = rigHeight;
   maxBoundsCache = null;
-  draw();
+  if (spriteSet && spriteSet.ready) drawSprite();
+  else draw();
 }
 
 // Food/window-role updates for prop windows (pizza bites + jiggle, drink tilt).
@@ -476,7 +551,32 @@ ipcRenderer.on('character:rig', async (_event, payload) => {
 
 window.addEventListener('resize', resizeCanvas);
 
+function isPropWindow() {
+  return foodBitesTotal > 0 || drinkMode;
+}
+
 async function main() {
+  // Sprite (legacy) build and not a kitchen/food prop (those stay rigs in both builds - there
+  // is no sprite art for them).
+  if (spriteModeRequested && !isPropWindow()) {
+    spriteSet = window.SpriteSet.load(characterId);
+    return new Promise((resolve) => {
+      spriteSet.onReady = (hasSprites) => {
+        if (hasSprites) {
+          resizeCanvas();
+        } else {
+          // No sprite folder (custom characters, e.g.) - fall back to rig rendering.
+          spriteSet = null;
+          mainRig();
+        }
+        resolve();
+      };
+    });
+  }
+  mainRig();
+}
+
+async function mainRig() {
   // Custom (user-created) characters store their rig outside renderer/rigs/, in the writable
   // workspace dir - see jsCharacterEngine.js's createWindow(), which passes this query param
   // only when there's no built-in renderer/rigs/<id>.json for this character.
